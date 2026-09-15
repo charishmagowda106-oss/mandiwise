@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply text-gray-900 antialiased;
+  margin: 0;
+  min-width: 320px;
+  background: #f8f6ec;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button, input, select { font: inherit; }
+
+@layer components {
+  .mw-panel { @apply rounded-3xl border border-[#d8d8ca] bg-white shadow-sm; }
+  .mw-label { @apply mb-2 block text-sm font-semibold text-[#283129]; }
+  .mw-input { @apply w-full rounded-2xl border border-[#d2d4c5] bg-white px-4 py-3 outline-none transition focus:border-[#1f7a3e] focus:ring-2 focus:ring-[#1f7a3e]/15; }
+  .mw-button { @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-[#197638] px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-[#125d2b] disabled:cursor-not-allowed disabled:opacity-60; }
+  .mw-button-soft { @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-[#e9ecd7] px-5 py-3 font-semibold text-[#16331d] transition hover:bg-[#dde3c4]; }
+}
