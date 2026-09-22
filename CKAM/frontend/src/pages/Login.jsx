@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Sprout } from 'lucide-react';
+import { getApiErrorMessage } from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export default function Login() {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Check your connection and try again.');
+      setError(getApiErrorMessage(err, 'Login failed. Check your connection and try again.'));
     } finally {
       setSubmitting(false);
     }

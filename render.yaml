@@ -1,0 +1,21 @@
+# Render Blueprint: one web service (API + built website) + free Postgres.
+services:
+  - type: web
+    name: mandiwise
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mandiwise-db
+          property: connectionString
+      - key: DATA_GOV_API_KEY
+        value: ""
+
+databases:
+  - name: mandiwise-db
+    plan: free
+    databaseName: mandiwise

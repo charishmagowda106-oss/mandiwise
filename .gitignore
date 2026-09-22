@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Local environments & bundled tools
+CKAM/.venv/
+CKAM/.tools/
+
+# Node
+node_modules/
+CKAM/frontend/dist/
+
+# Local database — auto-seeded on first boot; Render uses Postgres instead
+*.db
+
+# Secrets / local env (keep .env.example)
+.env
+**/.env
+
+# Archives (backups stay out of the repo)
+*.zip
+
+# OS noise
+.DS_Store
+Thumbs.db

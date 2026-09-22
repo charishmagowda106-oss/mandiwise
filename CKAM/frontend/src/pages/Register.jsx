@@ -2,9 +2,11 @@ import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Sprout } from 'lucide-react';
+import { getApiErrorMessage } from '../services/api';
+import { requestCurrentLocation } from '../services/location';
 
 export default function Register() {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', location_lat: 20.0, location_lng: 78.0 });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', location_lat: null, location_lng: null });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { register } = useContext(AuthContext);
@@ -15,10 +17,18 @@ export default function Register() {
     setError('');
     setSubmitting(true);
     try {
-      await register(formData);
+      // Capture the farmer's actual location at sign-up (best effort).
+      let location = { location_lat: formData.location_lat, location_lng: formData.location_lng };
+      try {
+        const fresh = await requestCurrentLocation({ timeout: 6000 });
+        location = { location_lat: fresh.lat, location_lng: fresh.lng };
+      } catch {
+        /* denied or unavailable — register without a location */
+      }
+      await register({ ...formData, ...location });
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      setError(getApiErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -42,7 +52,7 @@ export default function Register() {
           {error && <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
           <div>
             <label htmlFor="register-name" className="mw-label">Your name</label>
-            <input id="register-name" name="name" autoComplete="name" type="text" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} required className="mw-input" />
+            <input id="register-name" name="name" autoComplete="name" type="text" minLength="2" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} required className="mw-input" />
           </div>
           <div>
             <label htmlFor="register-email" className="mw-label">Email</label>
@@ -50,7 +60,8 @@ export default function Register() {
           </div>
           <div>
             <label htmlFor="register-password" className="mw-label">Password</label>
-            <input id="register-password" name="password" autoComplete="new-password" type="password" minLength="6" value={formData.password} onChange={e=>setFormData({...formData, password: e.target.value})} required className="mw-input" />
+            <input id="register-password" name="password" autoComplete="new-password" type="password" minLength="8" maxLength="72" value={formData.password} onChange={e=>setFormData({...formData, password: e.target.value})} required className="mw-input" />
+            <p className="mt-1 text-xs text-gray-500">Use 8–72 characters.</p>
           </div>
           <button disabled={submitting} type="submit" className="mw-button w-full">{submitting ? 'Creating account…' : 'Create account'}</button>
         </form>

@@ -1,0 +1,10 @@
+# Run the whole site (website + API) locally in one container on http://localhost:8000
+services:
+  mandiwise:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=local-dev-secret-change-me
+      - CORS_ORIGINS=http://localhost:5173
+    # No DATABASE_URL -> bundled SQLite, created and seeded on first boot.

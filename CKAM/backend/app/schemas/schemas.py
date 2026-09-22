@@ -1,13 +1,20 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 from datetime import date
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
-    name: str
+    password: str = Field(min_length=8, max_length=72)
+    name: str = Field(min_length=2, max_length=100)
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes")
+        return value
 
 class UserOut(BaseModel):
     id: int
@@ -16,6 +23,14 @@ class UserOut(BaseModel):
     location_lat: Optional[float]
     location_lng: Optional[float]
     
+    class Config:
+        from_attributes = True
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    location_lat: Optional[float] = None
+    location_lng: Optional[float] = None
+
     class Config:
         from_attributes = True
 

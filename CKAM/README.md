@@ -10,7 +10,7 @@ MandiWise is a university demonstration app that helps farmers compare mandi ret
 - Price prediction using the included Random Forest model and encoder
 - Responsive agricultural UI based on the supplied reference screens
 
-The bundled price history is clearly labelled sample/demo data, not live market reporting. Predictions are estimates, not guaranteed prices.
+The mandi-rates screen fetches current Karnataka wholesale rates from the official AGMARKNET/data.gov.in feed. The bundled history and ML prediction model remain demo data, so predictions are estimates, not guaranteed market prices.
 
 ## Windows setup (any folder)
 
@@ -82,6 +82,7 @@ No `.env` file is required for the local demo. Optional backend environment vari
 - `SECRET_KEY`: JWT signing secret; change it outside a local demonstration.
 - `DATABASE_URL`: SQLAlchemy database URL. The default is the project-root `mandiwise.db`.
 - `CORS_ORIGINS`: comma-separated allowed frontend origins. The default allows local Vite URLs.
+- `DATA_GOV_API_KEY`: optional data.gov.in API key. A shared public demonstration key is used locally when this is omitted; set your own key for reliable production traffic.
 
 ## Tests and production build
 

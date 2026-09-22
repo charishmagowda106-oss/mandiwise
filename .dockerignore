@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/__pycache__
+**/*.pyc
+CKAM/.venv
+CKAM/.tools
+CKAM/frontend/dist
+CKAM/mandiwise.db
+*.db
+*.zip
+.env
+**/.env
