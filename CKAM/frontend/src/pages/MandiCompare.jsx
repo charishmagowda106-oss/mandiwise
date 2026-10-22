@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api, { getApiErrorMessage } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { haversineKm, matchMarket, normalizeMarketName } from '../services/location';
-import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy } from 'lucide-react';
+import { useLanguage } from '../i18n';
+import PriceTrendChart from '../components/PriceTrendChart';
+import MandiMap from '../components/MandiMap';
+import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle } from 'lucide-react';
 
 const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
@@ -15,6 +18,7 @@ const formatStamp = value => {
 };
 
 export default function MandiCompare() {
+  const { t } = useLanguage();
   const [crops, setCrops] = useState([]);
   const [cropId, setCropId] = useState('');
   const [mandis, setMandis] = useState([]);
@@ -35,10 +39,8 @@ export default function MandiCompare() {
         if (cropsRes.data.length) setCropId(String(cropsRes.data[0].id));
         setMandis(mandisRes.data);
       })
-      .catch(() =>
-        setError(getApiErrorMessage(null, 'Could not load crop and mandi lists. Make sure the backend is running.')),
-      );
-  }, []);
+      .catch(() => setError(getApiErrorMessage(null, t('err.cropsMandis'))));
+  }, [t]);
 
   const selectedCrop = crops.find(item => String(item.id) === String(cropId));
 
@@ -76,7 +78,7 @@ export default function MandiCompare() {
       }
       setLiveResults({ ...res.data, records });
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not load live Karnataka rates. Please try again shortly.'));
+      setError(getApiErrorMessage(err, t('err.live')));
     } finally {
       setLoadingLive(false);
     }
@@ -86,7 +88,7 @@ export default function MandiCompare() {
     setRankError('');
     setRanked([]);
     if (!location) {
-      setRankError('Allow your location first (button above) so distances to each mandi can be calculated.');
+      setRankError(t('cmp.rankNoLoc'));
       return;
     }
     setLoadingRank(true);
@@ -101,21 +103,31 @@ export default function MandiCompare() {
       });
       setRanked(res.data);
     } catch (err) {
-      setRankError(getApiErrorMessage(err, 'Could not rank mandis for this crop. Please try again.'));
+      setRankError(getApiErrorMessage(err, t('err.rank')));
     } finally {
       setLoadingRank(false);
     }
   };
 
+  // One tap shares the full recommendation on WhatsApp.
+  const shareUrl = row => {
+    const lines = [
+      `🌾 MandiWise — ${selectedCrop?.name ?? ''}`,
+      `Best mandi: ${row.mandi_name} (${(row.distance_km ?? 0).toFixed(1)} km)`,
+      `Price: ₹${money(row.current_price)}/quintal`,
+      `Transport: ₹${money(row.transport_cost)}`,
+      `Estimated profit: ₹${money(row.estimated_profit)}`,
+      typeof window !== 'undefined' ? window.location.origin : '',
+    ].filter(Boolean);
+    return `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`;
+  };
+
   return (
     <div className="space-y-8">
       <header>
-        <p className="font-semibold text-[#197638]">Official live rates</p>
-        <h1 className="mt-2 text-4xl font-bold tracking-tight">Karnataka mandi prices</h1>
-        <p className="mt-3 text-gray-600">
-          Live wholesale modal prices from the Government of India’s AGMARKNET dataset, matched to the real
-          APMC markets nearest to you.
-        </p>
+        <p className="font-semibold text-[#197638]">{t('cmp.kicker')}</p>
+        <h1 className="mt-2 text-4xl font-bold tracking-tight">{t('cmp.title')}</h1>
+        <p className="mt-3 text-gray-600">{t('cmp.sub')}</p>
       </header>
 
       {/* Farmer's current location */}
@@ -123,25 +135,25 @@ export default function MandiCompare() {
         <div className="flex items-start gap-3">
           <div className="rounded-2xl bg-[#e9f4e9] p-3 text-[#197638]"><MapPin className="h-6 w-6" /></div>
           <div>
-            <p className="font-bold text-[#1c2b20]">Your current location</p>
+            <p className="font-bold text-[#1c2b20]">{t('loc.title')}</p>
             <p className="text-sm text-gray-500">
               {location
                 ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}${location.accuracy ? ` (±${Math.round(location.accuracy)} m)` : ''}`
-                : 'Not set — allow location to see distances and the nearest mandis.'}
+                : t('loc.notsetCompare')}
             </p>
             {locError && <p className="mt-1 text-sm text-red-600">{locError}</p>}
           </div>
         </div>
         <button type="button" onClick={refresh} disabled={locating} className="mw-button-soft">
           <Navigation className={`h-5 w-5 ${locating ? 'animate-pulse' : ''}`} />
-          {locating ? 'Locating…' : location ? 'Update location' : 'Use my current location'}
+          {locating ? t('loc.locating') : location ? t('loc.update') : t('loc.use')}
         </button>
       </section>
 
-      {/* Nearest real mandis */}
+      {/* Nearest real mandis + map */}
       {location && nearest.length > 0 && (
         <section>
-          <h2 className="text-2xl font-bold">Mandis near you</h2>
+          <h2 className="text-2xl font-bold">{t('cmp.nearby')}</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {nearest.map(mandi => (
               <div key={mandi.id} className="mw-panel p-5">
@@ -156,6 +168,9 @@ export default function MandiCompare() {
               </div>
             ))}
           </div>
+          <div className="mt-6">
+            <MandiMap location={location} mandis={nearest} />
+          </div>
         </section>
       )}
 
@@ -163,7 +178,7 @@ export default function MandiCompare() {
       <form onSubmit={handleLive} className="mw-panel grid gap-5 p-6 md:p-8">
         <div className="grid gap-5 md:grid-cols-3 md:items-end">
           <div>
-            <label htmlFor="compare-crop" className="mw-label">Crop</label>
+            <label htmlFor="compare-crop" className="mw-label">{t('cmp.crop')}</label>
             <select
               id="compare-crop"
               value={cropId}
@@ -176,7 +191,7 @@ export default function MandiCompare() {
             </select>
           </div>
           <div>
-            <label htmlFor="compare-quantity" className="mw-label">Load (quintals)</label>
+            <label htmlFor="compare-quantity" className="mw-label">{t('cmp.load')}</label>
             <input
               id="compare-quantity"
               type="number"
@@ -191,11 +206,11 @@ export default function MandiCompare() {
         <div className="flex flex-wrap gap-3">
           <button type="submit" disabled={loadingLive} className="mw-button">
             <Radio className="h-5 w-5" />
-            {loadingLive ? 'Loading live rates…' : 'Show live rates'}
+            {loadingLive ? t('cmp.liveLoading') : t('cmp.live')}
           </button>
           <button type="button" onClick={handleRank} disabled={loadingRank} className="mw-button-soft">
             <Trophy className="h-5 w-5" />
-            {loadingRank ? 'Ranking mandis…' : 'Rank by profit'}
+            {loadingRank ? t('cmp.rankLoading') : t('cmp.rank')}
           </button>
         </div>
       </form>
@@ -211,22 +226,27 @@ export default function MandiCompare() {
         </p>
       )}
 
+      {/* Two-year price trend (always available once a crop is picked) */}
+      {cropId && mandis.length > 0 && (
+        <PriceTrendChart cropId={cropId} mandis={mandis} />
+      )}
+
       {/* Live results */}
       {liveResults && (
         <section>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-2xl font-bold">Live rates{selectedCrop ? ` — ${selectedCrop.name}` : ''}</h2>
+            <h2 className="text-2xl font-bold">{t('cmp.liveTitle', { crop: selectedCrop ? selectedCrop.name : '' })}</h2>
             <p className="text-sm text-gray-500">
-              {liveResults.source}{liveResults.updated_at ? ` · synced ${formatStamp(liveResults.updated_at)}` : ''}
+              {liveResults.source}{liveResults.updated_at ? ` · ${t('cmp.synced', { when: formatStamp(liveResults.updated_at) })}` : ''}
             </p>
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            {liveResults.records.length} market report{liveResults.records.length === 1 ? '' : 's'}
-            {location ? ', sorted by distance from you.' : '.'}
+            {liveResults.records.length === 1 ? t('cmp.reportsOne') : t('cmp.reports', { n: liveResults.records.length })}
+            {location ? t('cmp.sortedByDistance') : '.'}
           </p>
           {liveResults.records.length === 0 ? (
             <p className="mt-4 rounded-2xl bg-[#f6f5ea] p-5 text-gray-600">
-              No live reports for this crop right now — try another crop.
+              {t('cmp.noLive')}
             </p>
           ) : (
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -251,11 +271,11 @@ export default function MandiCompare() {
                   </div>
                   {record.min_price != null && record.max_price != null && (
                     <p className="mt-1 text-sm text-gray-500">
-                      Range {money(record.min_price)}–{money(record.max_price)}
+                      {t('cmp.range', { min: money(record.min_price), max: money(record.max_price) })}
                     </p>
                   )}
                   <p className="mt-3 text-xs text-gray-400">
-                    Reported {record.arrival_date}{record.variety ? ` · ${record.variety}` : ''}
+                    {t('cmp.reported', { date: record.arrival_date })}{record.variety ? ` · ${record.variety}` : ''}
                   </p>
                 </article>
               ))}
@@ -268,12 +288,9 @@ export default function MandiCompare() {
       {ranked.length > 0 && (
         <section>
           <h2 className="text-2xl font-bold">
-            Best mandi{selectedCrop ? ` for ${selectedCrop.name}` : ''} · {quantity} quintal
+            {t('cmp.rankTitle', { crop: selectedCrop ? t('cmp.rankFor', { crop: selectedCrop.name }) : '', qty: quantity })}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Distances from your current location. Ranking prices come from the bundled sample history —
-            compare with the live rates above before deciding.
-          </p>
+          <p className="mt-1 text-sm text-gray-500">{t('cmp.rankSub')}</p>
           <div className="mt-4 space-y-3">
             {ranked.map(row => (
               <div
@@ -289,19 +306,34 @@ export default function MandiCompare() {
                       {row.mandi_name}
                       {row.rank === 1 && (
                         <span className="ml-2 rounded-full bg-[#197638] px-2 py-0.5 text-xs font-semibold text-white">
-                          BEST MANDI
+                          {t('cmp.best')}
                         </span>
                       )}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {(row.distance_km ?? 0).toFixed(1)} km · price ₹{money(row.current_price)}/qtl · transport ₹
-                      {money(row.transport_cost)}
+                      {t('cmp.rowMeta', {
+                        km: (row.distance_km ?? 0).toFixed(1),
+                        price: money(row.current_price),
+                        transport: money(row.transport_cost),
+                      })}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-[#1c2b20]">Est. profit ₹{money(row.estimated_profit)}</p>
-                  <p className="text-sm text-gray-500">revenue ₹{money(row.expected_revenue)}</p>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-[#1c2b20]">{t('cmp.estProfit', { amount: money(row.estimated_profit) })}</p>
+                    <p className="text-sm text-gray-500">{t('cmp.revenue', { amount: money(row.expected_revenue) })}</p>
+                  </div>
+                  <a
+                    href={shareUrl(row)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={t('cmp.share')}
+                    className="flex items-center gap-2 rounded-xl border border-[#d8d8ca] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[#f4f2e8]"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {t('cmp.share')}
+                  </a>
                 </div>
               </div>
             ))}

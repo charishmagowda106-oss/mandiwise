@@ -71,3 +71,18 @@ def test_compare_mandis():
         for result in data:
             assert result["expected_revenue"] == round(result["current_price"] * 50, 2)
             assert result["estimated_profit"] == round(result["expected_revenue"] - result["transport_cost"], 2)
+
+def test_price_history():
+    response = client.get("/api/prices/history", params={"crop_id": 1, "mandi_id": 1})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["crop"] and data["mandi"]
+    assert len(data["points"]) > 0
+    point = data["points"][0]
+    assert set(point.keys()) == {"date", "min_price", "max_price", "modal_price"}
+    # Oldest -> newest so trend charts draw left to right
+    dates = [item["date"] for item in data["points"]]
+    assert dates == sorted(dates)
+    # Unknown ids must fail with a clear message, not an empty chart
+    missing = client.get("/api/prices/history", params={"crop_id": 999999, "mandi_id": 1})
+    assert missing.status_code == 404
