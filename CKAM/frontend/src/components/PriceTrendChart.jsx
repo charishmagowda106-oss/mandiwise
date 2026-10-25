@@ -86,9 +86,9 @@ export default function PriceTrendChart({ cropId, mandis }) {
                 contentStyle={{ borderRadius: 12, borderColor: '#dedfce' }}
               />
               <Legend wrapperStyle={{ fontSize: 13 }} />
-              <Line type="linear" dataKey="modal_price" name={t('cmp.trendModal')} stroke="#197638" strokeWidth={3} dot={{ r: 2.5, fill: '#197638', strokeWidth: 0 }} />
-              <Line type="linear" dataKey="max_price" name={t('cmp.trendMax')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
-              <Line type="linear" dataKey="min_price" name={t('cmp.trendMin')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
+              <Line type="linear" isAnimationActive={false} dataKey="modal_price" name={t('cmp.trendModal')} stroke="#197638" strokeWidth={3} dot={{ r: 2.5, fill: '#197638', strokeWidth: 0 }} />
+              <Line type="linear" isAnimationActive={false} dataKey="max_price" name={t('cmp.trendMax')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
+              <Line type="linear" isAnimationActive={false} dataKey="min_price" name={t('cmp.trendMin')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
