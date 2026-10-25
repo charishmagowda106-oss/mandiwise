@@ -9,7 +9,7 @@ const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDi
 
 const monthLabel = iso => new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
 
-// Two-year monthly trend (min/max band as thin lines, modal price as the bold one).
+// Two-year monthly trend as a straight-line graph (min/max thin dashed, modal bold).
 export default function PriceTrendChart({ cropId, mandis }) {
   const { t } = useLanguage();
   const [mandiId, setMandiId] = useState('');
@@ -86,9 +86,9 @@ export default function PriceTrendChart({ cropId, mandis }) {
                 contentStyle={{ borderRadius: 12, borderColor: '#dedfce' }}
               />
               <Legend wrapperStyle={{ fontSize: 13 }} />
-              <Line type="monotone" dataKey="modal_price" name={t('cmp.trendModal')} stroke="#197638" strokeWidth={3} dot={false} />
-              <Line type="monotone" dataKey="max_price" name={t('cmp.trendMax')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
-              <Line type="monotone" dataKey="min_price" name={t('cmp.trendMin')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
+              <Line type="linear" dataKey="modal_price" name={t('cmp.trendModal')} stroke="#197638" strokeWidth={3} dot={{ r: 2.5, fill: '#197638', strokeWidth: 0 }} />
+              <Line type="linear" dataKey="max_price" name={t('cmp.trendMax')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
+              <Line type="linear" dataKey="min_price" name={t('cmp.trendMin')} stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

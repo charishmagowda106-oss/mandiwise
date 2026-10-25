@@ -4,7 +4,6 @@ import useLocation from '../hooks/useLocation';
 import { haversineKm, matchMarket, normalizeMarketName } from '../services/location';
 import { useLanguage } from '../i18n';
 import PriceTrendChart from '../components/PriceTrendChart';
-import MandiMap from '../components/MandiMap';
 import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle } from 'lucide-react';
 
 const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -150,7 +149,7 @@ export default function MandiCompare() {
         </button>
       </section>
 
-      {/* Nearest real mandis + map */}
+      {/* Nearest real mandis */}
       {location && nearest.length > 0 && (
         <section>
           <h2 className="text-2xl font-bold">{t('cmp.nearby')}</h2>
@@ -167,9 +166,6 @@ export default function MandiCompare() {
                 <p className="text-sm text-gray-500">{mandi.district} district</p>
               </div>
             ))}
-          </div>
-          <div className="mt-6">
-            <MandiMap location={location} mandis={nearest} />
           </div>
         </section>
       )}
