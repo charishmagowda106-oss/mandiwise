@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useLanguage } from '../i18n';
 import { TrendingUp, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import ForecastChart from '../components/ForecastChart';
 
 const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
@@ -40,5 +41,8 @@ export default function PricePrediction() {
       <div className="mw-panel border-[#91b49a] bg-[#f1f6ea] p-7"><p className="flex items-center gap-2 text-gray-500"><Clock className="h-5 w-5"/>{t('pred.predicted', { days: form.days_ahead })}</p><p className="mt-3 text-4xl font-bold">₹{money(result.predicted_price)}</p><p className={`mt-3 flex items-center gap-1 font-bold ${result.expected_change_percent >= 0 ? 'text-green-700' : 'text-red-700'}`}>{result.expected_change_percent >= 0 ? <ArrowUpRight className="h-5 w-5"/> : <ArrowDownRight className="h-5 w-5"/>}{result.expected_change_percent}%</p></div>
       <p className="text-sm text-gray-500 md:col-span-2">{result.disclaimer}</p>
     </section>}
+    {result && (
+      <ForecastChart cropId={form.crop_id} mandiId={form.mandi_id} daysAhead={form.days_ahead} />
+    )}
   </div>;
 }

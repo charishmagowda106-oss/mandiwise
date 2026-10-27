@@ -69,3 +69,63 @@ def predict_price(req: PredictRequest, db: Session = Depends(get_db)):
         predicted_price=round(pred, 2),
         expected_change_percent=round(change, 2)
     )
+
+class ForecastRequest(BaseModel):
+    crop_id: int
+    mandi_id: int
+    days_ahead: int = 7   # how many future days to forecast (1-365)
+
+class ForecastPoint(BaseModel):
+    date: str
+    days_ahead: int
+    predicted_price: float
+
+class ForecastResponse(BaseModel):
+    current_price: float
+    points: list[ForecastPoint]
+
+@router.post("/forecast", response_model=ForecastResponse)
+def forecast_prices(req: ForecastRequest, db: Session = Depends(get_db)):
+    """Daily modal-price forecast for the next N days (one model load,
+    one batched predict) so the front end can draw a future-prices graph."""
+    try:
+        model = joblib.load(model_path)
+        encoder = joblib.load(encoder_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="ML model not found. Please train first.")
+
+    crop = db.query(Crop).filter(Crop.id == req.crop_id).first()
+    mandi = db.query(Mandi).filter(Mandi.id == req.mandi_id).first()
+    if not crop or not mandi:
+        raise HTTPException(status_code=404, detail="Crop or Mandi not found")
+
+    latest_price = (
+        db.query(HistoricalPrice)
+        .filter(
+            HistoricalPrice.crop_id == req.crop_id,
+            HistoricalPrice.mandi_id == req.mandi_id,
+        )
+        .order_by(HistoricalPrice.date.desc())
+        .first()
+    )
+    if not latest_price:
+        raise HTTPException(status_code=404, detail="No historical price found for this crop and mandi")
+    current_price = latest_price.modal_price
+
+    days = max(1, min(int(req.days_ahead), 365))
+    dates = [(datetime.now() + timedelta(days=d)) for d in range(1, days + 1)]
+
+    # same features as /predict/: month, day, year, lag(= latest price) + one-hot crop/mandi
+    X_num = np.array([[d.month, d.day, d.year, current_price] for d in dates])
+    X_cat = encoder.transform(pd.DataFrame([[crop.name, mandi.name]], columns=['crop', 'mandi']))
+    X = np.hstack([X_num, np.repeat(X_cat, len(dates), axis=0)])
+    preds = model.predict(X)
+
+    return ForecastResponse(
+        current_price=current_price,
+        points=[
+            ForecastPoint(date=d.strftime("%Y-%m-%d"), days_ahead=i + 1,
+                          predicted_price=round(float(p), 2))
+            for i, (d, p) in enumerate(zip(dates, preds))
+        ],
+    )

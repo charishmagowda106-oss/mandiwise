@@ -3,7 +3,6 @@ import api, { getApiErrorMessage } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { haversineKm, matchMarket, normalizeMarketName } from '../services/location';
 import { useLanguage } from '../i18n';
-import PriceTrendChart from '../components/PriceTrendChart';
 import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle } from 'lucide-react';
 
 const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
@@ -220,11 +219,6 @@ export default function MandiCompare() {
         <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
           {rankError}
         </p>
-      )}
-
-      {/* Two-year price trend (always available once a crop is picked) */}
-      {cropId && mandis.length > 0 && (
-        <PriceTrendChart cropId={cropId} mandis={mandis} />
       )}
 
       {/* Live results */}
