@@ -21,7 +21,7 @@ if (-not $ApiBase) {
     $ip = (Get-NetIPAddress -AddressFamily IPv4 |
         Where-Object { $_.IPAddress -like '192.168.*' -or $_.IPAddress -like '10.*' } |
         Select-Object -First 1).IPAddress
-    if (-not $ip) { throw "No LAN IP found — pass -ApiBase explicitly" }
+    if (-not $ip) { throw "No LAN IP found - pass -ApiBase explicitly" }
     $ApiBase = "http://${ip}:8000/api"
 }
 Write-Host "API base: $ApiBase"

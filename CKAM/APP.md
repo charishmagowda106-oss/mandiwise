@@ -4,6 +4,27 @@ Two ways to experience MandiWise as an app, from "right now" to "real APK":
 
 ---
 
+## 🌐 Live deployment (works anywhere, no setup)
+
+**https://mandiwise.onrender.com** — the full app (site + API) is deployed on
+Render's free tier and works from any phone or browser worldwide. It was
+provisioned via the Render API:
+
+| Piece | Render resource |
+|---|---|
+| Web service | `mandiwise` (Docker from this repo, `srv-dap6ustg1s2s739lh28g`) |
+| Database | `mandiwise-db` — free Postgres 17 in Oregon (`dpg-…`) |
+| API base (baked into the APK) | `https://mandiwise.onrender.com/api` |
+
+Notes:
+- Free services **spin down after ~15 min without traffic** — the first request
+  then takes ~50 s to wake up. Later requests are instant.
+- Every `git push` to `main` auto-deploys (Render watches the repo).
+- The OTP "dev code" is returned in the API response because no SMTP/SMS
+  provider is configured on Render (same as local dev).
+
+---
+
 ## 1. Today, on your phone (no install, ~1 minute)
 
 The backend serves the built web app, so your phone just needs to be on the
@@ -53,8 +74,8 @@ cd CKAM
 .\build_apk.ps1                 # API = your PC's LAN IP (same-Wi-Fi testing)
 .\build_apk.ps1 -ApiBase https://your-app.onrender.com/api   # API = hosted backend
 ```
-Output: **`CKAM\MandiWise-1.0.apk`** — already built once, so you can share
-the existing file right now.
+Output: **`CKAM\MandiWise-1.0.0.apk`** — already built (pointed at the live
+Render backend), so you can share the existing file right now.
 
 ### Run it live in Android Studio (optional)
 ```powershell
@@ -63,16 +84,15 @@ npm run app:open     # opens the project; press Run ▶ on emulator or USB devic
 ```
 
 ### Sharing for reviews
-- Send `MandiWise-1.0.apk` via WhatsApp / Drive / email. Reviewers tap it and
+- Send `MandiWise-1.0.0.apk` via WhatsApp / Drive / email. Reviewers tap it and
   allow **"Install from unknown sources"** when asked (standard for sideloaded
   APKs). Works on Android 7.0+.
-- **The APK talks to your PC** (`http://192.168.0.110:8000/api` — baked in at
-  build time), so reviewers must be on **your Wi-Fi** and your PC must be on
-  with the backend running. That's ideal for family/house reviews.
-- **For reviewers anywhere**: host the backend (the repo ships `render.yaml`
-  for Render's free tier), then rebuild with
-  `.\build_apk.ps1 -ApiBase https://<your-render-app>.onrender.com/api`.
-  No other change needed.
+- **The shipped APK talks to the hosted backend**
+  (`https://mandiwise.onrender.com/api` — baked in at build time), so
+  reviewers can use it **from anywhere** — no need to be on your Wi-Fi and
+  your PC doesn't need to be on.
+- For local-only testing you can rebuild against your PC instead:
+  `.\build_apk.ps1` (uses your LAN IP).
 - It's a **debug-signed** APK (fine for reviews). For a public release later,
   add a release keystore and build `assembleRelease`.
 
