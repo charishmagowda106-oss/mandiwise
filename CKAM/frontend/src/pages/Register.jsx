@@ -9,7 +9,7 @@ import LanguageToggle from '../components/LanguageToggle';
 
 export default function Register() {
   const { t } = useLanguage();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', location_lat: null, location_lng: null });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '', location_lat: null, location_lng: null });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { register } = useContext(AuthContext);
@@ -63,6 +63,24 @@ export default function Register() {
           <div>
             <label htmlFor="register-email" className="mw-label">{t('login.email')}</label>
             <input id="register-email" name="email" autoComplete="email" type="email" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} required className="mw-input" />
+          </div>
+          <div>
+            <label htmlFor="register-phone" className="mw-label">{t('login.phone')}</label>
+            <input
+              id="register-phone"
+              name="phone"
+              autoComplete="tel-national"
+              inputMode="tel"
+              type="tel"
+              placeholder="98765 43210"
+              minLength={10}
+              maxLength={14}
+              value={formData.phone}
+              onChange={e=>setFormData({...formData, phone: e.target.value})}
+              required
+              className="mw-input"
+            />
+            <p className="mt-1 text-xs text-gray-500">{t('reg.phoneHint')}</p>
           </div>
           <div>
             <label htmlFor="register-password" className="mw-label">{t('login.password')}</label>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MandiWise</string>
+    <string name="title_activity_main">MandiWise</string>
+    <string name="package_name">com.mandiwise.app</string>
+    <string name="custom_url_scheme">com.mandiwise.app</string>
+</resources>

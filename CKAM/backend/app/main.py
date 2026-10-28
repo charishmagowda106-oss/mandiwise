@@ -8,11 +8,35 @@ from app.services.seed import ensure_seed
 # Create tables and seed empty ones (crops, real Karnataka mandis, sample history)
 ensure_seed()
 
-app = FastAPI(title="MandiWise API")
+from contextlib import asynccontextmanager  # noqa: E402
+import asyncio  # noqa: E402
+
+from app.services.alert_checker import alert_worker
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Run the price-alert checker alongside the API."""
+    worker = asyncio.create_task(alert_worker())
+    try:
+        yield
+    finally:
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="MandiWise API", lifespan=lifespan)
 
 allowed_origins = [origin.strip() for origin in os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173",
+    # localhost dev servers + the Capacitor app WebView (https://localhost)
+    # + phone-on-LAN access to the dev server.
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,"
+    "http://localhost:8000,http://127.0.0.1:8000,https://localhost,"
+    "http://localhost,capacitor://localhost",
 ).split(",") if origin.strip()]
 
 app.add_middleware(

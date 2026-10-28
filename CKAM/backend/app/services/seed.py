@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import inspect, text
 
 from app.database.session import Base, SessionLocal, engine
 import app.models.models  # noqa: F401  (register mappings before create_all)
@@ -17,6 +18,25 @@ from app.services.karnataka_mandis import REAL_MANDIS
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 HISTORY_CSV = PROJECT_ROOT / "data" / "sample" / "historical_prices.csv"
+
+# Columns added after the first release. create_all() never alters existing
+# tables, so these get appended here (SQLite and Postgres both accept ADD COLUMN).
+USER_COLUMNS = {
+    "phone": "VARCHAR",
+    "phone_verified": "BOOLEAN DEFAULT FALSE",
+}
+
+
+def _ensure_user_columns() -> None:
+    try:
+        existing = {column["name"] for column in inspect(engine).get_columns("users")}
+        with engine.begin() as conn:
+            for name, ddl_type in USER_COLUMNS.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl_type}"))
+                    print(f"[migrate] added users.{name}")
+    except Exception as exc:  # never block start-up on migration
+        print(f"[migrate] skipped ({exc})")
 
 
 def _seed_mandis(db) -> None:
@@ -63,6 +83,7 @@ def _load_history(db) -> None:
 def ensure_seed() -> None:
     """Create tables and fill empty ones. Idempotent."""
     Base.metadata.create_all(bind=engine)
+    _ensure_user_columns()  # create_all never adds columns to existing tables
     db = SessionLocal()
     try:
         if db.query(Crop).count() == 0:

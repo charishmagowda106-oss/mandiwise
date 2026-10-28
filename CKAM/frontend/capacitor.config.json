@@ -1,0 +1,12 @@
+{
+  "appId": "com.mandiwise.app",
+  "appName": "MandiWise",
+  "webDir": "dist",
+  "android": {
+    "allowNavigation": ["192.168.0.110", "localhost", "127.0.0.1"],
+    "backgroundColor": "#f8f6ec"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

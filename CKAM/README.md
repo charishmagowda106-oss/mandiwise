@@ -103,3 +103,7 @@ npm run build
 - Estimated selling return = gross revenue − transport cost
 
 Haversine distance is straight-line distance, not road distance. The included dataset is synthetic demo data and should be replaced with an official live source for production use.
+
+## Run it as an app
+
+The project now ships two app paths — a PWA you can open on your phone over Wi-Fi today, and a ready-made Capacitor Android project under `frontend/android` for building a real APK. See **[APP.md](APP.md)** for step-by-step instructions (including OTP login, price alerts, and SMS/email delivery config).

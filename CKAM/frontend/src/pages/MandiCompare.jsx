@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { haversineKm, matchMarket, normalizeMarketName } from '../services/location';
 import { useLanguage } from '../i18n';
-import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle } from 'lucide-react';
+import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle, BellRing, CheckCircle2 } from 'lucide-react';
 
 const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
@@ -27,6 +28,9 @@ export default function MandiCompare() {
   const [loadingRank, setLoadingRank] = useState(false);
   const [error, setError] = useState('');
   const [rankError, setRankError] = useState('');
+  const [alertBusy, setAlertBusy] = useState(false);
+  const [alertNotice, setAlertNotice] = useState('');
+  const navigate = useNavigate();
 
   const { location, loading: locating, error: locError, refresh } = useLocation({ autoAsk: true });
 
@@ -107,9 +111,33 @@ export default function MandiCompare() {
     }
   };
 
+  // Watch this deal: creates a price alert prefilled from the current ranking.
+  const best = ranked[0];
+  const createQuickAlert = async () => {
+    if (!best || !location) return;
+    setAlertBusy(true);
+    setAlertNotice('');
+    try {
+      const target = Math.floor((best.estimated_profit * 0.95) / 50) * 50; // ~current best, rounded down
+      await api.post('/alerts', {
+        crop_id: Number(cropId),
+        quantity: Number(quantity) || 1,
+        unit: 'quintal',
+        lat: location.lat,
+        lng: location.lng,
+        transport_rate_per_km: 10,
+        min_profit: Math.max(target, 0),
+      });
+      setAlertNotice(t('cmp.alertCreated', { amount: money(Math.max(target, 0)) }));
+    } catch (err) {
+      setAlertNotice(getApiErrorMessage(err, t('cmp.alertError')));
+    } finally {
+      setAlertBusy(false);
+    }
+  };
+
   // One tap shares the full recommendation on WhatsApp.
-  const shareUrl = row => {
-    const lines = [
+  const shareUrl = row => {    const lines = [
       `🌾 MandiWise — ${selectedCrop?.name ?? ''}`,
       `Best mandi: ${row.mandi_name} (${(row.distance_km ?? 0).toFixed(1)} km)`,
       `Price: ₹${money(row.current_price)}/quintal`,
@@ -281,6 +309,28 @@ export default function MandiCompare() {
             {t('cmp.rankTitle', { crop: selectedCrop ? t('cmp.rankFor', { crop: selectedCrop.name }) : '', qty: quantity })}
           </h2>
           <p className="mt-1 text-sm text-gray-500">{t('cmp.rankSub')}</p>
+          {best && location && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={createQuickAlert}
+                disabled={alertBusy}
+                className="mw-button"
+              >
+                <BellRing className="h-5 w-5" />
+                {alertBusy ? t('cmp.alertSaving') : t('cmp.alertMe', { amount: money(Math.floor((best.estimated_profit * 0.95) / 50) * 50) })}
+              </button>
+              <button type="button" onClick={() => navigate('/alerts')} className="mw-button-soft">
+                {t('cmp.alertManage')}
+              </button>
+            </div>
+          )}
+          {alertNotice && (
+            <p className="mt-3 flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              {alertNotice}
+            </p>
+          )}
           <div className="mt-4 space-y-3">
             {ranked.map(row => (
               <div

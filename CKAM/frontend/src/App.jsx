@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import MandiCompare from './pages/MandiCompare';
 import PricePrediction from './pages/PricePrediction';
+import Alerts from './pages/Alerts';
 import AppErrorBoundary from './components/AppErrorBoundary';
 
 const ProtectedRoute = ({ children }) => {
@@ -29,6 +30,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="compare" element={<MandiCompare />} />
           <Route path="predict" element={<PricePrediction />} />
+          <Route path="alerts" element={<Alerts />} />
         </Route>
         </Routes>
       </BrowserRouter>

@@ -25,3 +25,8 @@ CKAM/frontend/dist/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+CKAM/MandiWise-*.apk
+CKAM/frontend/android/app/build/
+CKAM/frontend/android/.gradle/
