@@ -184,7 +184,7 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
     if mirror_payload is not None:
         age = _data_age(mirror_payload.get("updated_at"))
         if age is not None and age <= MIRROR_MAX_AGE:
-            payload = {**mirror_payload, "stale": False}
+            payload = {**mirror_payload, "stale": False, "source_errors": failures}
             _cache_put(key, payload)
             return {**payload, "cached": False}
         failures.append(f"_fetch_mirror: newest sync is {age} old (limit {MIRROR_MAX_AGE})")
@@ -194,7 +194,7 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
     try:
         payload = _fetch_datagov(commodity, limit)
         if payload["records"]:
-            fresh = {**payload, "stale": False}
+            fresh = {**payload, "stale": False, "source_errors": failures}
             _cache_put(key, fresh)
             return {**fresh, "cached": False}
         failures.append("_fetch_datagov: no records")
@@ -208,7 +208,7 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
     if mirror_payload is not None and mirror_payload["records"]:
         log.warning("serving stale mirror data (sync %s) — %s",
                     mirror_payload.get("updated_at"), "; ".join(failures))
-        stale_payload = {**mirror_payload, "stale": True}
+        stale_payload = {**mirror_payload, "stale": True, "source_errors": failures}
         _cache_put(key, stale_payload)
         return {**stale_payload, "cached": False}
 
