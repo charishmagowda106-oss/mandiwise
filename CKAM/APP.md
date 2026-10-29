@@ -4,6 +4,25 @@ Two ways to experience MandiWise as an app, from "right now" to "real APK":
 
 ---
 
+## What's inside
+
+- **My Crops home screen** — add the crop you've sown (quantity, sown/harvest
+  dates, optional cost breakdown) and the dashboard becomes your personal
+  ledger: color-coded status (Growing / Harvest soon / Ready to sell), a live
+  harvest countdown, the **best mandi today** with price + estimated revenue
+  for your lot, and one-tap **Compare** that prefills the mandi-comparison
+  page. Harvest-window notification is pushed once when a crop is due (±7 days).
+- **Mandi comparison** — official AGMARKNET live rates + distance-aware
+  profit ranking across 68 real Karnataka APMC mandis, with map, trend chart
+  and WhatsApp sharing.
+- **Price predictions** — trained Random Forest model + forecast chart.
+- **Price alerts** — watch a crop against a target profit; a background worker
+  checks every 2 minutes (4-hour cooldown) and notifies in-app.
+- **Phone + OTP login** (alternative to password), **English/ಕನ್ನಡ**, and a
+  shared **location picker** (GPS or manual search of towns/mandis).
+
+---
+
 ## 🌐 Live deployment (works anywhere, no setup)
 
 **https://mandiwise.onrender.com** — the full app (site + API) is deployed on
