@@ -215,6 +215,7 @@ const translations = {
     'cmp.alertCreated': 'Alert created — we will message you when profit reaches ₹{amount}.',
     'cmp.alertError': 'Could not create the alert.',
     'cmp.alertManage': 'Manage alerts',
+    'cmp.stale': 'Upstream market sync is delayed — showing the last available data (synced {when}). We keep retrying.',
 
     'err.market': 'Could not load market data. Make sure the backend is running.',
     'err.cropsMandis': 'Could not load crop and mandi lists. Make sure the backend is running.',
@@ -432,6 +433,7 @@ const translations = {
     'cmp.alertCreated': 'ಎಚ್ಚರಿಕೆ ರಚಿಸಲಾಗಿದೆ — ಲಾಭ ₹{amount} ತಲುಪಿದಾಗ ಸಂದೇಶ ಕಳುಹಿಸುತ್ತೇವೆ.',
     'cmp.alertError': 'ಎಚ್ಚರಿಕೆ ರಚಿಸಲಾಗಲಿಲ್ಲ.',
     'cmp.alertManage': 'ಎಚ್ಚರಿಕೆಗಳ ನಿರ್ವಹಣೆ',
+    'cmp.stale': 'ಮಾರುಕಟ್ಟೆ ಸಿಂಕ್ ಮೇಲಿನಿಂದ ವಿಳಂಬವಾಗಿದೆ — ಕೊನೆಯ ಲಭ್ಯ ಡೇಟಾ ತೋರಿಸಲಾಗುತ್ತಿದೆ (ಸಿಂಕ್ {when}). ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತಲಿರುತ್ತೇವೆ.',
 
     'err.market': 'ಮಾರುಕಟ್ಟೆ ಮಾಹಿತಿ ಲೋಡ್ ಆಗಲಿಲ್ಲ. ಬ್ಯಾಕೆಂಡ್ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.',
     'err.cropsMandis': 'ಬೆಳೆ ಮತ್ತು ಮಂಡಿ ಪಟ್ಟಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ. ಬ್ಯಾಕೆಂಡ್ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ ಪರಿಶೀಲಿಸಿ.',

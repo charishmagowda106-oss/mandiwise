@@ -4,7 +4,7 @@ import api, { getApiErrorMessage } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { haversineKm, matchMarket, normalizeMarketName } from '../services/location';
 import { useLanguage } from '../i18n';
-import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle, BellRing, CheckCircle2 } from 'lucide-react';
+import { MapPin, Navigation, IndianRupee, Radio, Store, Trophy, MessageCircle, BellRing, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const money = value => Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
@@ -14,6 +14,15 @@ const formatStamp = value => {
   return Number.isNaN(date.getTime())
     ? String(value)
     : date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+};
+
+// Upstream sync delayed (flagged by the API, or older than 48h) → warn instead
+// of letting the panel imply these are today's rates.
+const isStale = results => {
+  if (!results) return false;
+  if (results.stale) return true;
+  const stamp = new Date(results.updated_at).getTime();
+  return Number.isFinite(stamp) && Date.now() - stamp > 48 * 3600 * 1000;
 };
 
 export default function MandiCompare() {
@@ -269,6 +278,12 @@ export default function MandiCompare() {
             {liveResults.records.length === 1 ? t('cmp.reportsOne') : t('cmp.reports', { n: liveResults.records.length })}
             {location ? t('cmp.sortedByDistance') : '.'}
           </p>
+          {isStale(liveResults) && (
+            <p className="mt-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {t('cmp.stale', { when: formatStamp(liveResults.updated_at) })}
+            </p>
+          )}
           {liveResults.records.length === 0 ? (
             <p className="mt-4 rounded-2xl bg-[#f6f5ea] p-5 text-gray-600">
               {t('cmp.noLive')}

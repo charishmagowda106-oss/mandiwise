@@ -1,8 +1,12 @@
 """Live Karnataka mandi price client.
 
-Fetch order:
-1. The daily AGMARKNET mirror (fast, keyless, synced from data.gov.in).
-2. The official data.gov.in AGMARKNET resource (used when the mirror is down).
+Fetch order (freshness-aware):
+1. The daily AGMARKNET mirror (fast, keyless, synced from data.gov.in) —
+   used when its newest sync is younger than MIRROR_MAX_AGE.
+2. The official data.gov.in AGMARKNET resource (preferred while the mirror
+   is stale or down; needs DATA_GOV_API_KEY — the public demo key is dead).
+3. If both fail, the stale mirror data is still served, flagged ``stale=True``
+   so the UI can label it honestly instead of pretending it is today's rate.
 
 Results are cached in-process (TTL below) so we stay inside the mirror's free
 rate limit (100 requests / 15 minutes / IP).
@@ -13,7 +17,7 @@ from __future__ import annotations
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -28,6 +32,9 @@ DEMO_API_KEY = "579b464db66ec23bdd0000017e2b72a7"
 CACHE_TTL_SECONDS = 10 * 60  # 10 minutes
 MIRROR_TIMEOUT = 45.0        # Render free services may cold-start
 DATAGOV_TIMEOUT = 15.0
+# A mirror sync older than this is treated as stale: prefer data.gov.in, and
+# if that fails too, serve the stale data with an honest flag.
+MIRROR_MAX_AGE = timedelta(hours=48)
 
 
 class LiveMarketDataError(Exception):
@@ -56,6 +63,24 @@ def _cache_get(key: str) -> dict[str, Any] | None:
 def _cache_put(key: str, payload: dict[str, Any]) -> None:
     with _cache_lock:
         _cache[key] = (time.time(), payload)
+
+
+def _data_age(updated_at: Any) -> timedelta | None:
+    """How old the payload's newest sync is; None when it cannot be parsed."""
+    if not updated_at:
+        return None
+    try:
+        stamp = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - stamp
+
+
+def _api_key() -> str:
+    # Empty string on Render must fall back to the demo key, not be sent as-is.
+    return (os.getenv("DATA_GOV_API_KEY") or "").strip() or DEMO_API_KEY
 
 
 def _normalise(record: dict[str, Any]) -> dict[str, Any] | None:
@@ -103,7 +128,7 @@ def _fetch_mirror(commodity: str | None, limit: int) -> dict[str, Any]:
 
 def _fetch_datagov(commodity: str | None, limit: int) -> dict[str, Any]:
     params: dict[str, Any] = {
-        "api-key": os.getenv("DATA_GOV_API_KEY", DEMO_API_KEY),
+        "api-key": _api_key(),
         "format": "json",
         "limit": min(max(limit, 1), 100),
         "filters[state]": "Karnataka",
@@ -122,7 +147,7 @@ def _fetch_datagov(commodity: str | None, limit: int) -> dict[str, Any]:
 
 
 def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict[str, Any]:
-    """Return current Karnataka mandi records, normalised, from the best source."""
+    """Return current Karnataka mandi records, normalised, from the freshest source."""
     limit = min(max(limit, 1), 200)
     key = (commodity or "").strip().lower()
 
@@ -131,17 +156,40 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
         return {**cached, "cached": True}
 
     failures: list[str] = []
-    for fetcher in (_fetch_mirror, _fetch_datagov):
-        try:
-            payload = fetcher(commodity, limit)
-        except Exception as exc:  # network / upstream problems all land here
-            failures.append(f"{fetcher.__name__}: {exc}")
-            continue
-        if not payload["records"]:
-            failures.append(f"{fetcher.__name__}: no records")
-            continue
-        _cache_put(key, payload)
-        return {**payload, "cached": False}
+
+    # 1) Mirror first — fast and keyless, but only trusted while its own sync
+    #    is recent (its daily job has been known to silently die for weeks).
+    mirror_payload: dict[str, Any] | None = None
+    try:
+        mirror_payload = _fetch_mirror(commodity, limit)
+    except Exception as exc:
+        failures.append(f"_fetch_mirror: {exc}")
+
+    if mirror_payload is not None:
+        age = _data_age(mirror_payload.get("updated_at"))
+        if age is not None and age <= MIRROR_MAX_AGE:
+            payload = {**mirror_payload, "stale": False}
+            _cache_put(key, payload)
+            return {**payload, "cached": False}
+        failures.append(f"_fetch_mirror: newest sync is {age} old (limit {MIRROR_MAX_AGE})")
+
+    # 2) Mirror stale or down → official data.gov.in (needs a real API key).
+    try:
+        payload = _fetch_datagov(commodity, limit)
+        if payload["records"]:
+            fresh = {**payload, "stale": False}
+            _cache_put(key, fresh)
+            return {**fresh, "cached": False}
+        failures.append("_fetch_datagov: no records")
+    except Exception as exc:
+        failures.append(f"_fetch_datagov: {exc}")
+
+    # 3) Nothing fresh: serve the last mirror data, honestly flagged as stale,
+    #    so the UI can show the real sync date instead of implying it is live.
+    if mirror_payload is not None and mirror_payload["records"]:
+        stale_payload = {**mirror_payload, "stale": True}
+        _cache_put(key, stale_payload)
+        return {**stale_payload, "cached": False}
 
     raise LiveMarketDataError(
         "The live mandi feed is temporarily unavailable — both the daily sync "

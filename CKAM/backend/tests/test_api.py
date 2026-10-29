@@ -346,3 +346,70 @@ def test_my_crops_rejects_unknown_crop():
         if u:
             db.query(User).filter(User.email == email).delete()
         db.commit(); db.close()
+
+
+def test_live_prices_freshness_order(monkeypatch):
+    """Fresh mirror wins; stale mirror defers to data.gov.in; if that is down
+    too, the stale mirror data is served with an honest ``stale`` flag."""
+    from datetime import datetime, timedelta, timezone
+    from app.services import agmarknet
+
+    stale_time = (datetime.now(timezone.utc) - timedelta(days=12)).isoformat()
+    fresh_time = datetime.now(timezone.utc).isoformat()
+
+    def stale_mirror(commodity, limit):
+        return {"source": "AGMARKNET / data.gov.in (daily sync)", "updated_at": stale_time,
+                "records": [{"mandi": "Old Mandi", "modal_price": 1000.0}]}
+
+    def fresh_mirror(commodity, limit):
+        return {"source": "AGMARKNET / data.gov.in (daily sync)", "updated_at": fresh_time,
+                "records": [{"mandi": "Mirror Fresh", "modal_price": 1500.0}]}
+
+    def fresh_datagov(commodity, limit):
+        return {"source": "AGMARKNET / data.gov.in (live)", "updated_at": fresh_time,
+                "records": [{"mandi": "Fresh Mandi", "modal_price": 2000.0}]}
+
+    def down(commodity, limit):
+        raise RuntimeError("official source down")
+
+    agmarknet._cache.clear()
+    try:
+        # 1) stale mirror ? official source preferred
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", stale_mirror)
+        monkeypatch.setattr(agmarknet, "_fetch_datagov", fresh_datagov)
+        out = agmarknet.get_karnataka_prices("Tomato", 5)
+        assert out["stale"] is False
+        assert out["records"][0]["mandi"] == "Fresh Mandi"
+
+        # 2) stale mirror + official down ? serve stale data, flagged
+        monkeypatch.setattr(agmarknet, "_fetch_datagov", down)
+        agmarknet._cache.clear()
+        out2 = agmarknet.get_karnataka_prices("Tomato", 5)
+        assert out2["stale"] is True
+        assert out2["records"][0]["mandi"] == "Old Mandi"
+
+        # 3) fresh mirror ? used directly, official never called
+        calls = {"datagov": 0}
+
+        def spy_datagov(commodity, limit):
+            calls["datagov"] += 1
+            return fresh_datagov(commodity, limit)
+
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", fresh_mirror)
+        monkeypatch.setattr(agmarknet, "_fetch_datagov", spy_datagov)
+        agmarknet._cache.clear()
+        out3 = agmarknet.get_karnataka_prices("Tomato", 5)
+        assert out3["stale"] is False
+        assert out3["records"][0]["mandi"] == "Mirror Fresh"
+        assert calls["datagov"] == 0
+    finally:
+        agmarknet._cache.clear()
+
+
+def test_api_key_falls_back_when_env_empty(monkeypatch):
+    from app.services import agmarknet
+
+    monkeypatch.setenv("DATA_GOV_API_KEY", "")
+    assert agmarknet._api_key() == agmarknet.DEMO_API_KEY
+    monkeypatch.setenv("DATA_GOV_API_KEY", "  my-real-key  ")
+    assert agmarknet._api_key() == "my-real-key"
