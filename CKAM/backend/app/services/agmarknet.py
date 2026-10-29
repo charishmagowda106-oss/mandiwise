@@ -35,6 +35,12 @@ DEMO_API_KEY = "579b464db66ec23bdd0000017e2b72a7"
 CACHE_TTL_SECONDS = 10 * 60  # 10 minutes
 MIRROR_TIMEOUT = 45.0        # Render free services may cold-start
 DATAGOV_TIMEOUT = 30.0       # official API is slow from outside India
+# data.gov.in's WAF silently drops requests from python-httpx's default
+# user-agent (connection timeout) — a browser UA is served normally.
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+)
 # A mirror sync older than this is treated as stale: prefer data.gov.in, and
 # if that fails too, serve the stale data with an honest flag.
 MIRROR_MAX_AGE = timedelta(hours=48)
@@ -138,7 +144,13 @@ def _fetch_datagov(commodity: str | None, limit: int) -> dict[str, Any]:
     }
     if commodity:
         params["filters[commodity]"] = commodity
-    response = httpx.get(API_URL, params=params, timeout=DATAGOV_TIMEOUT, follow_redirects=True)
+    response = httpx.get(
+        API_URL,
+        params=params,
+        timeout=DATAGOV_TIMEOUT,
+        follow_redirects=True,
+        headers={"User-Agent": BROWSER_UA, "Accept": "application/json"},
+    )
     response.raise_for_status()
     payload = response.json()
     records = [r for r in (_normalise(item) for item in payload.get("records", [])) if r]
