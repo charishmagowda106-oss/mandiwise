@@ -18,4 +18,13 @@ button, input, select { font: inherit; }
   .mw-input { @apply w-full rounded-2xl border border-[#d2d4c5] bg-white px-4 py-3 outline-none transition focus:border-[#1f7a3e] focus:ring-2 focus:ring-[#1f7a3e]/15; }
   .mw-button { @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-[#197638] px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-[#125d2b] disabled:cursor-not-allowed disabled:opacity-60; }
   .mw-button-soft { @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-[#e9ecd7] px-5 py-3 font-semibold text-[#16331d] transition hover:bg-[#dde3c4]; }
+  .mw-hero { @apply relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#197638] via-[#1c8342] to-[#0e5a29] p-7 text-white shadow-md sm:p-9; }
+  .mw-chip { @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold; }
 }
+
+@keyframes mw-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mw-rise { animation: mw-rise 0.35s ease both; }

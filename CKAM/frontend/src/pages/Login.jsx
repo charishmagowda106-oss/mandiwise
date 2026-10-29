@@ -96,14 +96,18 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f4e7] px-5 py-14">
-      <div className="mx-auto w-full max-w-lg">
+    <div className="relative min-h-screen overflow-hidden bg-[#f3f4e7] px-5 py-14">
+      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-300/30 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 -right-20 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl" />
+      <div className="relative mx-auto w-full max-w-lg">
         <div className="mb-4 flex justify-end">
           <LanguageToggle />
         </div>
-        <div className="mb-10 flex items-center justify-center gap-3 text-[#197638]">
-          <Sprout className="h-10 w-10" />
-          <h1 className="text-3xl font-bold">MandiWise</h1>
+        <div className="mb-10 flex items-center justify-center gap-3">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-[#197638] to-[#0e5a29] text-white shadow-md">
+            <Sprout className="h-7 w-7" />
+          </span>
+          <h1 className="bg-gradient-to-r from-[#197638] to-[#2f9e4f] bg-clip-text text-3xl font-bold text-transparent">MandiWise</h1>
         </div>
         <div className="mw-panel p-7 sm:p-9">
           <h2 className="text-2xl font-bold">{t('login.title')}</h2>

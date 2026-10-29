@@ -165,3 +165,53 @@ class NotificationOut(BaseModel):
 class NotificationPage(BaseModel):
     items: List[NotificationOut]
     unread: int
+
+class UserCropCreate(BaseModel):
+    crop_id: int
+    quantity: float = Field(default=10.0, gt=0, le=100000, description="Expected harvest in quintals")
+    sown_date: Optional[date] = None
+    expected_harvest_date: Optional[date] = None
+    cost_seed: Optional[float] = Field(default=None, ge=0)
+    cost_fertilizer: Optional[float] = Field(default=None, ge=0)
+    cost_labor: Optional[float] = Field(default=None, ge=0)
+    cost_other: Optional[float] = Field(default=None, ge=0)
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+class UserCropUpdate(BaseModel):
+    quantity: Optional[float] = Field(default=None, gt=0, le=100000)
+    sown_date: Optional[date] = None
+    expected_harvest_date: Optional[date] = None
+    cost_seed: Optional[float] = Field(default=None, ge=0)
+    cost_fertilizer: Optional[float] = Field(default=None, ge=0)
+    cost_labor: Optional[float] = Field(default=None, ge=0)
+    cost_other: Optional[float] = Field(default=None, ge=0)
+
+class BestNow(BaseModel):
+    """Live best-market snapshot for one of the farmer's crops."""
+    mandi_name: str
+    distance_km: float
+    current_price: float
+    expected_revenue: float
+    estimated_profit: float
+
+class UserCropOut(BaseModel):
+    id: int
+    crop_id: int
+    crop_name: str
+    category: Optional[str] = None
+    quantity: float
+    sown_date: Optional[date]
+    expected_harvest_date: Optional[date]
+    days_to_harvest: Optional[int] = None
+    status: str                              # watching | growing | soon | ready
+    total_cost: Optional[float] = None
+    cost_seed: Optional[float] = None
+    cost_fertilizer: Optional[float] = None
+    cost_labor: Optional[float] = None
+    cost_other: Optional[float] = None
+    best: Optional[BestNow] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

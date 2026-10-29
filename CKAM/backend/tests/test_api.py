@@ -239,3 +239,110 @@ def test_location_search_merges_osm_results(monkeypatch):
 def test_location_search_rejects_too_short():
     response = client.get("/api/locations/search", params={"q": "a"})
     assert response.status_code == 422
+
+
+def _login(email, password):
+    r = client.post("/api/auth/login", data={"username": email, "password": password})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_my_crops_workflow():
+    """Create -> list (enriched) -> update -> delete a watched crop."""
+    from datetime import date, timedelta
+    from app.models.models import UserCrop
+
+    email = f"mycrops-{uuid4().hex}@example.com"
+    payload = {"name": "Ledger Farmer", "email": email, "password": "test-pass-123",
+               "phone": make_phone(), "location_lat": 12.97, "location_lng": 77.59}
+    assert client.post("/api/auth/register", json=payload).status_code == 200
+    headers = _login(email, payload["password"])
+    try:
+        crop_id = client.get("/api/crops/").json()[0]["id"]
+        harvest = date.today() + timedelta(days=20)
+        created = client.post("/api/my-crops", headers=headers, json={
+            "crop_id": crop_id, "quantity": 15,
+            "sown_date": str(date.today() - timedelta(days=60)),
+            "expected_harvest_date": str(harvest),
+            "cost_seed": 2000, "cost_fertilizer": 4000, "cost_labor": 3000,
+        })
+        assert created.status_code == 201, created.text
+        row = created.json()
+        assert row["quantity"] == 15
+        assert row["days_to_harvest"] == 20
+        assert row["status"] == "growing"
+        assert row["total_cost"] == 9000
+        assert row["best"] is not None and row["best"]["mandi_name"]
+
+        listed = client.get("/api/my-crops", headers=headers).json()
+        assert len(listed) == 1 and listed[0]["id"] == row["id"]
+
+        patched = client.patch(f"/api/my-crops/{row['id']}", headers=headers,
+                               json={"quantity": 25, "expected_harvest_date": str(date.today() + timedelta(days=5))})
+        assert patched.status_code == 200
+        assert patched.json()["quantity"] == 25
+        assert patched.json()["status"] == "soon"
+
+        assert client.delete(f"/api/my-crops/{row['id']}", headers=headers).status_code == 204
+        assert client.get("/api/my-crops", headers=headers).json() == []
+    finally:
+        db = SessionLocal()
+        uid = db.query(User).filter(User.email == email).first()
+        if uid:
+            db.query(UserCrop).filter(UserCrop.user_id == uid.id).delete()
+            db.query(User).filter(User.email == email).delete()
+        db.commit(); db.close()
+
+
+def test_my_crop_harvest_notification_fires_once():
+    """A crop due within the harvest window notifies exactly once."""
+    from datetime import date, timedelta
+    from app.models.models import UserCrop, User as UserModel
+    from app.services.alert_checker import evaluate_harvest_windows
+
+    email = f"harvest-{uuid4().hex}@example.com"
+    payload = {"name": "Harvest Farmer", "email": email, "password": "test-pass-123",
+               "phone": make_phone(), "location_lat": 12.97, "location_lng": 77.59}
+    assert client.post("/api/auth/register", json=payload).status_code == 200
+    headers = _login(email, payload["password"])
+    try:
+        crop_id = client.get("/api/crops/").json()[0]["id"]
+        created = client.post("/api/my-crops", headers=headers, json={
+            "crop_id": crop_id, "quantity": 10,
+            "expected_harvest_date": str(date.today() + timedelta(days=3)),
+        })
+        assert created.status_code == 201
+
+        db = SessionLocal()
+        try:
+            assert evaluate_harvest_windows(db) >= 1   # window open -> notifies
+            uc = db.query(UserCrop).join(UserModel, UserModel.id == UserCrop.user_id).filter(UserModel.email == email).first()
+            assert uc.harvest_notified_at is not None
+            assert evaluate_harvest_windows(db) == 0   # already notified -> silent
+            notes = db.query(Notification).join(UserModel, UserModel.id == Notification.user_id).filter(UserModel.email == email).all()
+            assert any(n.kind == "harvest_window" for n in notes)
+        finally:
+            db.close()
+    finally:
+        db = SessionLocal()
+        u = db.query(User).filter(User.email == email).first()
+        if u:
+            db.query(Notification).filter(Notification.user_id == u.id).delete()
+            db.query(UserCrop).filter(UserCrop.user_id == u.id).delete()
+            db.query(User).filter(User.email == email).delete()
+        db.commit(); db.close()
+
+
+def test_my_crops_rejects_unknown_crop():
+    email = f"mycrops-bad-{uuid4().hex}@example.com"
+    payload = {"name": "Bad Crop", "email": email, "password": "test-pass-123", "phone": make_phone()}
+    assert client.post("/api/auth/register", json=payload).status_code == 200
+    headers = _login(email, payload["password"])
+    try:
+        response = client.post("/api/my-crops", headers=headers, json={"crop_id": 999999, "quantity": 5})
+        assert response.status_code == 404
+    finally:
+        db = SessionLocal()
+        u = db.query(User).filter(User.email == email).first()
+        if u:
+            db.query(User).filter(User.email == email).delete()
+        db.commit(); db.close()

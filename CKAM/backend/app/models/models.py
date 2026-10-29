@@ -98,3 +98,26 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     user = relationship("User", back_populates="notifications")
+
+class UserCrop(Base):
+    """A crop the farmer has actually sown — what to watch, when to harvest,
+    and what it cost, so the app can advise on real selling decisions."""
+    __tablename__ = "user_crops"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    crop_id = Column(Integer, ForeignKey("crops.id"), nullable=False)
+    quantity = Column(Float, default=10.0)          # expected harvest, quintals
+    sown_date = Column(Date, nullable=True)
+    expected_harvest_date = Column(Date, nullable=True)
+    # Costs are optional; when present the app can estimate real net profit.
+    cost_seed = Column(Float, nullable=True)
+    cost_fertilizer = Column(Float, nullable=True)
+    cost_labor = Column(Float, nullable=True)
+    cost_other = Column(Float, nullable=True)
+    lat = Column(Float, nullable=True)              # field location (falls back to profile)
+    lng = Column(Float, nullable=True)
+    harvest_notified_at = Column(DateTime, nullable=True)  # one notification per harvest window
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    crop = relationship("Crop")

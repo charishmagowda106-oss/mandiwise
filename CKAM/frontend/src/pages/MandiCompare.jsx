@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { getApiErrorMessage } from '../services/api';
 import useLocation from '../hooks/useLocation';
 import { haversineKm, matchMarket, normalizeMarketName } from '../services/location';
@@ -31,6 +31,8 @@ export default function MandiCompare() {
   const [alertBusy, setAlertBusy] = useState(false);
   const [alertNotice, setAlertNotice] = useState('');
   const navigate = useNavigate();
+  // Dashboard "Compare" links land here as /compare?crop=<id>&qty=<n> to prefill.
+  const [searchParams] = useSearchParams();
 
   const { location, loading: locating, error: locError, refresh } = useLocation({ autoAsk: true });
 
@@ -38,11 +40,16 @@ export default function MandiCompare() {
     Promise.all([api.get('/crops/'), api.get('/mandis/')])
       .then(([cropsRes, mandisRes]) => {
         setCrops(cropsRes.data);
-        if (cropsRes.data.length) setCropId(String(cropsRes.data[0].id));
+        const paramCrop = searchParams.get('crop');
+        const paramQty = searchParams.get('qty');
+        const matched = paramCrop && cropsRes.data.some(item => String(item.id) === String(paramCrop));
+        if (matched) setCropId(String(paramCrop));
+        else if (cropsRes.data.length) setCropId(String(cropsRes.data[0].id));
+        if (paramQty && Number(paramQty) > 0) setQuantity(String(paramQty));
         setMandis(mandisRes.data);
       })
       .catch(() => setError(getApiErrorMessage(null, t('err.cropsMandis'))));
-  }, [t]);
+  }, [t, searchParams]);
 
   const selectedCrop = crops.find(item => String(item.id) === String(cropId));
 

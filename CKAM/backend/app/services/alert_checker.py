@@ -16,10 +16,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from app.database.session import SessionLocal
-from app.models.models import Notification, PriceAlert, User
+from app.models.models import Notification, PriceAlert, User, UserCrop
 from app.services import notify
 from app.services.ranking import rank_mandis
 
@@ -29,6 +29,8 @@ CHECK_INTERVAL_SECONDS = int(os.getenv("ALERT_CHECK_INTERVAL_SECONDS", "120"))
 COOLDOWN_MINUTES = int(os.getenv("ALERT_COOLDOWN_MINUTES", "240"))
 # Ignore sub-₹1 / sub-0.5% profit wobble when deciding "something changed".
 CHANGE_FLOOR = 1.0
+# A watched crop notifies once when its harvest date is this close or past.
+HARVEST_WINDOW_DAYS = 7
 
 
 def _money(value: float) -> str:
@@ -114,6 +116,74 @@ def evaluate_alert(db, alert: PriceAlert) -> Notification | None:
     return notification
 
 
+def evaluate_harvest_windows(db) -> int:
+    """Notify each farmer once when a watched crop's harvest date is due
+    (or within HARVEST_WINDOW_DAYS), with the best mandi to sell at today."""
+    today = date.today()
+    due = (
+        db.query(UserCrop)
+        .filter(
+            UserCrop.expected_harvest_date.isnot(None),
+            UserCrop.harvest_notified_at.is_(None),
+            UserCrop.expected_harvest_date <= today + timedelta(days=HARVEST_WINDOW_DAYS),
+        )
+        .all()
+    )
+    created = 0
+    for uc in due:
+        try:
+            crop_name = uc.crop.name if uc.crop else "Your crop"
+            days = (uc.expected_harvest_date - today).days
+            if days < 0:
+                when = f"was due {-days} day(s) ago"
+            elif days == 0:
+                when = "is due today"
+            else:
+                when = f"is due in {days} day(s)"
+            title = f"{crop_name}: harvest {when}"
+
+            lat = uc.lat if uc.lat is not None else None
+            lng = uc.lng if uc.lng is not None else None
+            if lat is None or lng is None:
+                user = db.get(User, uc.user_id)
+                if user is not None:
+                    lat, lng = user.location_lat, user.location_lng
+            body = f"You marked {uc.quantity:g} quintals of {crop_name} for this harvest."
+            if lat is not None and lng is not None:
+                ranking = rank_mandis(
+                    db, crop_id=uc.crop_id, quantity=uc.quantity, unit="quintal",
+                    lat=lat, lng=lng, transport_rate_per_km=10.0,
+                )
+                if ranking:
+                    best = ranking[0]
+                    body += (
+                        f" Today's best: {best['mandi_name']} at ₹{_money(best['current_price'])}/quintal"
+                        f" — about ₹{_money(best['expected_revenue'])} for your quantity"
+                        f" ({best['distance_km']:.1f} km away)."
+                    )
+            body += " Open the app to compare all nearby mandis."
+
+            notification = Notification(
+                user_id=uc.user_id,
+                kind="harvest_window",
+                title=title,
+                body=body,
+                link="/",
+            )
+            db.add(notification)
+            uc.harvest_notified_at = datetime.utcnow()
+            db.commit()
+            created += 1
+
+            farmer = db.get(User, uc.user_id)
+            if farmer is not None and notify.smtp_configured():
+                notify.send_email(farmer.email, f"MandiWise harvest reminder — {title}", f"{title}\n\n{body}")
+        except Exception as exc:  # one bad crop must not block the rest
+            log.warning("harvest check for crop %s failed: %s", uc.id, exc)
+            db.rollback()
+    return created
+
+
 def run_alert_check() -> int:
     """Evaluate every active alert once. Safe to call from a thread or endpoint."""
     db = SessionLocal()
@@ -126,6 +196,7 @@ def run_alert_check() -> int:
                     created += 1
             except Exception as exc:  # one bad alert must not block the rest
                 log.warning("alert %s failed: %s", alert.id, exc)
+        created += evaluate_harvest_windows(db)
         if created:
             log.info("[alerts] created %s notification(s)", created)
     finally:
