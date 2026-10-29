@@ -14,6 +14,7 @@ rate limit (100 requests / 15 minutes / IP).
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -21,6 +22,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+
+log = logging.getLogger("mandiwise.agmarknet")
 
 MIRROR_URL = "https://mandi-api.onrender.com/v1/prices"
 RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
@@ -31,7 +34,7 @@ DEMO_API_KEY = "579b464db66ec23bdd0000017e2b72a7"
 
 CACHE_TTL_SECONDS = 10 * 60  # 10 minutes
 MIRROR_TIMEOUT = 45.0        # Render free services may cold-start
-DATAGOV_TIMEOUT = 15.0
+DATAGOV_TIMEOUT = 30.0       # official API is slow from outside India
 # A mirror sync older than this is treated as stale: prefer data.gov.in, and
 # if that fails too, serve the stale data with an honest flag.
 MIRROR_MAX_AGE = timedelta(hours=48)
@@ -164,6 +167,7 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
         mirror_payload = _fetch_mirror(commodity, limit)
     except Exception as exc:
         failures.append(f"_fetch_mirror: {exc}")
+        log.warning("live-price mirror failed: %s", exc)
 
     if mirror_payload is not None:
         age = _data_age(mirror_payload.get("updated_at"))
@@ -172,6 +176,7 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
             _cache_put(key, payload)
             return {**payload, "cached": False}
         failures.append(f"_fetch_mirror: newest sync is {age} old (limit {MIRROR_MAX_AGE})")
+        log.warning("mirror stale (%s old) — trying official data.gov.in", age)
 
     # 2) Mirror stale or down → official data.gov.in (needs a real API key).
     try:
@@ -181,12 +186,16 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
             _cache_put(key, fresh)
             return {**fresh, "cached": False}
         failures.append("_fetch_datagov: no records")
+        log.warning("data.gov.in returned no records")
     except Exception as exc:
         failures.append(f"_fetch_datagov: {exc}")
+        log.warning("data.gov.in failed: %s", exc)
 
     # 3) Nothing fresh: serve the last mirror data, honestly flagged as stale,
     #    so the UI can show the real sync date instead of implying it is live.
     if mirror_payload is not None and mirror_payload["records"]:
+        log.warning("serving stale mirror data (sync %s) — %s",
+                    mirror_payload.get("updated_at"), "; ".join(failures))
         stale_payload = {**mirror_payload, "stale": True}
         _cache_put(key, stale_payload)
         return {**stale_payload, "cached": False}
