@@ -4,6 +4,7 @@ from app.api.endpoints import (
     auth,
     crops,
     live_prices,
+    locations,
     mandis,
     ml_predict,
     notifications,
@@ -23,6 +24,7 @@ router.include_router(mandis.router, prefix="/mandis", tags=["mandis"])
 router.include_router(ml_predict.router, prefix="/predict", tags=["predict"])
 router.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
 router.include_router(live_prices.router, prefix="/live-prices", tags=["live-prices"])
+router.include_router(locations.router, prefix="/locations", tags=["locations"])
 router.include_router(prices.router, prefix="/prices", tags=["prices"])
 router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

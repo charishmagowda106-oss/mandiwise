@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database.session import SessionLocal
-from app.models.models import User, OtpCode, PriceAlert, Notification
+from app.models.models import User, OtpCode, PriceAlert, Notification, Mandi
 from uuid import uuid4
 import secrets
 
@@ -187,3 +187,55 @@ def test_price_history():
     # Unknown ids must fail with a clear message, not an empty chart
     missing = client.get("/api/prices/history", params={"crop_id": 999999, "mandi_id": 1})
     assert missing.status_code == 404
+
+
+def test_location_search_local_town(monkeypatch):
+    """Local town list answers without any network call."""
+    from app.api.endpoints import locations
+    monkeypatch.setattr(locations, "_fetch_osm", lambda q, limit: [])
+    locations._cache.clear()
+    response = client.get("/api/locations/search", params={"q": "mysuru", "limit": 1})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["query"] == "mysuru"
+    assert len(body["results"]) == 1
+    place = body["results"][0]
+    assert place["source"] in ("town", "mandi")  # mandis rank above towns on ties
+    assert "mysuru" in (place["name"] + place["display"]).lower()
+    assert isinstance(place["lat"], float) and isinstance(place["lng"], float)
+
+
+def test_location_search_finds_mandi_from_db(monkeypatch):
+    """A seeded mandi is found by name prefix."""
+    from app.api.endpoints import locations
+    monkeypatch.setattr(locations, "_fetch_osm", lambda q, limit: [])
+    locations._cache.clear()
+    db = SessionLocal()
+    try:
+        mandi = db.query(Mandi).first()
+    finally:
+        db.close()
+    prefix = mandi.name[:4]
+    response = client.get("/api/locations/search", params={"q": prefix, "limit": 15})
+    assert response.status_code == 200
+    sources = {item["source"] for item in response.json()["results"]}
+    assert "mandi" in sources
+
+
+def test_location_search_merges_osm_results(monkeypatch):
+    """Unknown places fall through to the (mocked) OpenStreetMap results."""
+    from app.api.endpoints import locations
+    from app.api.endpoints.locations import PlaceResult
+    fake = [PlaceResult(name="Samplepur", display="Samplepur, Karnataka, India",
+                        lat=14.5, lng=76.0, source="osm")]
+    monkeypatch.setattr(locations, "_fetch_osm", lambda q, limit: fake)
+    locations._cache.clear()
+    response = client.get("/api/locations/search", params={"q": "zzzz-unknown"})
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert any(item["source"] == "osm" and item["name"] == "Samplepur" for item in results)
+
+
+def test_location_search_rejects_too_short():
+    response = client.get("/api/locations/search", params={"q": "a"})
+    assert response.status_code == 422

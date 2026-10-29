@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import { useLanguage } from './i18n';
 import Layout from './components/Layout';
+import { LocationProvider } from './context/LocationContext';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -26,7 +27,7 @@ function App() {
         <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route path="/" element={<ProtectedRoute><LocationProvider><Layout /></LocationProvider></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="compare" element={<MandiCompare />} />
           <Route path="predict" element={<PricePrediction />} />

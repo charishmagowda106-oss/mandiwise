@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useLanguage } from '../i18n';
 import LanguageToggle from './LanguageToggle';
+import LocationPicker from './LocationPicker';
 import { Sprout, LogOut, MapPin, TrendingUp, Home, Menu, X, BellRing } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -40,6 +41,7 @@ export default function Layout() {
             ))}
             <span className="ml-2 text-sm text-gray-500">{user?.name}</span>
             <LanguageToggle />
+            <LocationPicker />
             <NotificationBell label={t('nav.notifications')} />
             <button onClick={handleLogout} className="ml-1 flex items-center gap-2 rounded-xl border border-[#d8d8ca] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-[#f4f2e8]">
               <LogOut className="h-4 w-4" /> {t('nav.logout')}
@@ -47,6 +49,7 @@ export default function Layout() {
           </nav>
           <div className="flex items-center gap-2 md:hidden">
             <LanguageToggle />
+            <LocationPicker />
             <NotificationBell label={t('nav.notifications')} />
             <button aria-label="Toggle navigation" onClick={() => setMenuOpen(v => !v)} className="rounded-xl border border-[#d8d8ca] p-2.5 text-[#1d3323]">
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

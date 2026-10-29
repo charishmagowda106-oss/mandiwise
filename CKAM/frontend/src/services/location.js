@@ -1,6 +1,15 @@
 export const STORAGE_KEY = 'mw_location_v1';
 export const ASKED_KEY = 'mw_location_asked_v1';
 
+import api from './api';
+
+/** Search places by name for the manual picker (local mandis/towns + OSM). */
+export const searchLocations = async (query, { limit = 8 } = {}) => {
+  const res = await api.get('/locations/search', { params: { q: query, limit } });
+  return res.data.results || [];
+};
+
+
 export const readStoredLocation = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
