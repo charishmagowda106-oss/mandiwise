@@ -1,0 +1,35 @@
+name: Daily mandi data relay
+
+# Fetches the official AGMARKNET daily price feed (Karnataka) and publishes it
+# to the `live-data` branch, which https://mandiwise.onrender.com reads —
+# Render's IPs cannot reach api.data.gov.in directly.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 14,22 * * *'   # 19:30 & 03:30 IST — evening + overnight catch-up
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch official AGMARKNET daily prices (Karnataka)
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+        run: python3 .github/scripts/fetch_mandi.py
+
+      - name: Publish to live-data branch
+        run: |
+          git config user.name "mandiwise-relay"
+          git config user.email "mandiwise-relay@users.noreply.github.com"
+          git checkout --orphan live-data-publish
+          git rm -rq --cached .
+          git add karnataka.json
+          git commit -m "sync $(date -u +%FT%TZ)"
+          git push -f origin HEAD:live-data
