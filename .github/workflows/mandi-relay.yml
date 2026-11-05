@@ -7,7 +7,9 @@ name: Daily mandi data relay
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 14,22 * * *'   # 19:30 & 03:30 IST — evening + overnight catch-up
+    # 09:30, 15:30, 19:30 & 03:30 IST — four shots a day to ride out the
+    # shared demo key's rate-limit windows until a private key is configured.
+    - cron: '0 4,10,14,22 * * *'
 
 permissions:
   contents: write
@@ -15,7 +17,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

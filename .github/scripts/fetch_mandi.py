@@ -28,8 +28,8 @@ USER_AGENT = (
 )
 PAGE_SIZE = 1000
 MAX_PAGES = 10
-RETRY_ATTEMPTS = 10      # patient retries ride out shared-key 429 windows
-RETRY_SLEEP_SECONDS = 45
+RETRY_ATTEMPTS = 20      # patient retries ride out shared-key 429 windows
+RETRY_SLEEP_SECONDS = 60
 HTTP_TIMEOUT = 30.0      # keep worst-case retries inside the job's 25 minutes
 
 
