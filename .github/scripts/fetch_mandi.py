@@ -28,8 +28,9 @@ USER_AGENT = (
 )
 PAGE_SIZE = 1000
 MAX_PAGES = 10
-RETRY_ATTEMPTS = 15     # patient retries ride out shared-key 429 windows
-RETRY_SLEEP_SECONDS = 40
+RETRY_ATTEMPTS = 10      # patient retries ride out shared-key 429 windows
+RETRY_SLEEP_SECONDS = 45
+HTTP_TIMEOUT = 30.0      # keep worst-case retries inside the job's 25 minutes
 
 
 def fetch_page(api_key: str, offset: int) -> dict:
@@ -46,11 +47,17 @@ def fetch_page(api_key: str, offset: int) -> dict:
         f"{URL}?{params}",
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def main() -> int:
+    # CI captures stdout in blocks — stream lines so retry progress is visible
+    # live in the Actions log instead of arriving all at once at exit.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except (AttributeError, ValueError):
+        pass
     api_key = (os.environ.get("DATA_GOV_API_KEY") or "").strip() or DEFAULT_KEY
     records: list[dict] = []
     attempts = 0
