@@ -349,59 +349,93 @@ def test_my_crops_rejects_unknown_crop():
 
 
 def test_live_prices_freshness_order(monkeypatch):
-    """Fresh mirror wins; stale mirror defers to data.gov.in; if that is down
-    too, the stale mirror data is served with an honest ``stale`` flag."""
+    """Fresh relay wins and short-circuits; stale relay defers to the mirror
+    and official source; if everything is stale or down, the newest stale
+    data is served with an honest ``stale`` flag."""
+    import pytest
     from datetime import datetime, timedelta, timezone
     from app.services import agmarknet
 
-    stale_time = (datetime.now(timezone.utc) - timedelta(days=12)).isoformat()
     fresh_time = datetime.now(timezone.utc).isoformat()
+    stale_12d = (datetime.now(timezone.utc) - timedelta(days=12)).isoformat()
+    stale_19d = (datetime.now(timezone.utc) - timedelta(days=19)).isoformat()
 
-    def stale_mirror(commodity, limit):
-        return {"source": "AGMARKNET / data.gov.in (daily sync)", "updated_at": stale_time,
-                "records": [{"mandi": "Old Mandi", "modal_price": 1000.0}]}
+    def payload(source, when, mandi):
+        return {"source": source, "updated_at": when,
+                "records": [{"mandi": mandi, "modal_price": 1000.0}]}
 
-    def fresh_mirror(commodity, limit):
-        return {"source": "AGMARKNET / data.gov.in (daily sync)", "updated_at": fresh_time,
-                "records": [{"mandi": "Mirror Fresh", "modal_price": 1500.0}]}
+    def fresh_relay(c, l):
+        return payload("relay-src", fresh_time, "Relay Fresh")
 
-    def fresh_datagov(commodity, limit):
-        return {"source": "AGMARKNET / data.gov.in (live)", "updated_at": fresh_time,
-                "records": [{"mandi": "Fresh Mandi", "modal_price": 2000.0}]}
+    def stale_relay(c, l):
+        return payload("relay-src", stale_12d, "Relay Stale")
 
-    def down(commodity, limit):
-        raise RuntimeError("official source down")
+    def stale_mirror(c, l):
+        return payload("mirror-src", stale_12d, "Mirror Stale")
+
+    def older_mirror(c, l):
+        return payload("mirror-src", stale_19d, "Mirror Older")
+
+    def fresh_mirror(c, l):
+        return payload("mirror-src", fresh_time, "Mirror Fresh")
+
+    def fresh_datagov(c, l):
+        return payload("datagov-src", fresh_time, "Official Fresh")
+
+    def down(c, l):
+        raise RuntimeError("source down")
 
     agmarknet._cache.clear()
     try:
-        # 1) stale mirror ? official source preferred
-        monkeypatch.setattr(agmarknet, "_fetch_mirror", stale_mirror)
-        monkeypatch.setattr(agmarknet, "_fetch_datagov", fresh_datagov)
+        # 1) fresh relay wins; mirror and official source are never called
+        calls = {"mirror": 0, "datagov": 0}
+
+        def spy_mirror(c, l):
+            calls["mirror"] += 1
+            return stale_mirror(c, l)
+
+        def spy_datagov(c, l):
+            calls["datagov"] += 1
+            return fresh_datagov(c, l)
+
+        monkeypatch.setattr(agmarknet, "_fetch_relay", fresh_relay)
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", spy_mirror)
+        monkeypatch.setattr(agmarknet, "_fetch_datagov", spy_datagov)
         out = agmarknet.get_karnataka_prices("Tomato", 5)
         assert out["stale"] is False
-        assert out["records"][0]["mandi"] == "Fresh Mandi"
+        assert out["records"][0]["mandi"] == "Relay Fresh"
+        assert calls == {"mirror": 0, "datagov": 0}
 
-        # 2) stale mirror + official down ? serve stale data, flagged
-        monkeypatch.setattr(agmarknet, "_fetch_datagov", down)
+        # 2) stale relay -> stale mirror -> official source preferred
+        monkeypatch.setattr(agmarknet, "_fetch_relay", stale_relay)
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", stale_mirror)
+        monkeypatch.setattr(agmarknet, "_fetch_datagov", fresh_datagov)
         agmarknet._cache.clear()
         out2 = agmarknet.get_karnataka_prices("Tomato", 5)
-        assert out2["stale"] is True
-        assert out2["records"][0]["mandi"] == "Old Mandi"
+        assert out2["stale"] is False
+        assert out2["records"][0]["mandi"] == "Official Fresh"
 
-        # 3) fresh mirror ? used directly, official never called
-        calls = {"datagov": 0}
-
-        def spy_datagov(commodity, limit):
-            calls["datagov"] += 1
-            return fresh_datagov(commodity, limit)
-
-        monkeypatch.setattr(agmarknet, "_fetch_mirror", fresh_mirror)
-        monkeypatch.setattr(agmarknet, "_fetch_datagov", spy_datagov)
+        # 3) relay stale (12d) beats mirror stale (19d) in the stale fallback
+        monkeypatch.setattr(agmarknet, "_fetch_datagov", down)
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", older_mirror)
         agmarknet._cache.clear()
         out3 = agmarknet.get_karnataka_prices("Tomato", 5)
-        assert out3["stale"] is False
-        assert out3["records"][0]["mandi"] == "Mirror Fresh"
-        assert calls["datagov"] == 0
+        assert out3["stale"] is True
+        assert out3["records"][0]["mandi"] == "Relay Stale"
+
+        # 4) relay dead -> newest remaining stale source (mirror) is served
+        monkeypatch.setattr(agmarknet, "_fetch_relay", down)
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", stale_mirror)
+        agmarknet._cache.clear()
+        out4 = agmarknet.get_karnataka_prices("Tomato", 5)
+        assert out4["stale"] is True
+        assert out4["records"][0]["mandi"] == "Mirror Stale"
+
+        # 5) every source down -> clear 503-able error
+        monkeypatch.setattr(agmarknet, "_fetch_mirror", down)
+        agmarknet._cache.clear()
+        with pytest.raises(agmarknet.LiveMarketDataError):
+            agmarknet.get_karnataka_prices("Tomato", 5)
     finally:
         agmarknet._cache.clear()
 

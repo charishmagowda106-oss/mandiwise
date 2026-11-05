@@ -1,12 +1,16 @@
 """Live Karnataka mandi price client.
 
 Fetch order (freshness-aware):
-1. The daily AGMARKNET mirror (fast, keyless, synced from data.gov.in) —
-   used when its newest sync is younger than MIRROR_MAX_AGE.
-2. The official data.gov.in AGMARKNET resource (preferred while the mirror
-   is stale or down; needs DATA_GOV_API_KEY — the public demo key is dead).
-3. If both fail, the stale mirror data is still served, flagged ``stale=True``
-   so the UI can label it honestly instead of pretending it is today's rate.
+1. The GitHub Actions relay (``live-data`` branch): official data.gov.in rows
+   fetched daily by CI — Render's own IPs are firewalled off by data.gov.in
+   ([Errno 113] No route to host), GitHub's are not.
+2. The third-party AGMARKNET mirror (fast, keyless) — trusted only while its
+   newest sync is younger than MIRROR_MAX_AGE (its daily job has died for
+   weeks at a time).
+3. The official data.gov.in API directly (works outside Render's network).
+4. If nothing fresh is available, the newest stale data is still served,
+   flagged ``stale=True`` so the UI can label it honestly instead of
+   pretending it is today's rate.
 
 Results are cached in-process (TTL below) so we stay inside the mirror's free
 rate limit (100 requests / 15 minutes / IP).
@@ -26,6 +30,12 @@ import httpx
 log = logging.getLogger("mandiwise.agmarknet")
 
 MIRROR_URL = "https://mandi-api.onrender.com/v1/prices"
+# JSON published by .github/workflows/mandi-relay.yml (public repo → keyless).
+RELAY_URL = (
+    "https://raw.githubusercontent.com/charishmagowda106-oss/mandiwise/"
+    "live-data/karnataka.json"
+)
+RELAY_TIMEOUT = 15.0
 RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 API_URL = f"https://api.data.gov.in/resource/{RESOURCE_ID}"
 # data.gov.in's documented public demonstration key. Deployments should set
@@ -110,6 +120,24 @@ def _normalise(record: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _fetch_relay(commodity: str | None, limit: int) -> dict[str, Any]:
+    """Official data.gov.in rows, relayed daily via the GitHub Actions workflow."""
+    url = (os.getenv("MANDI_RELAY_URL") or "").strip() or RELAY_URL
+    response = httpx.get(url, timeout=RELAY_TIMEOUT, follow_redirects=True)
+    response.raise_for_status()
+    payload = response.json()
+    raw = payload.get("records") or []
+    if commodity:
+        wanted = commodity.strip().casefold()
+        raw = [r for r in raw if str(r.get("commodity", "")).strip().casefold() == wanted]
+    records = [r for r in (_normalise(item) for item in raw) if r]
+    return {
+        "source": "AGMARKNET / data.gov.in (daily relay)",
+        "updated_at": str(payload.get("fetched_at") or ""),
+        "records": records[:limit],
+    }
+
+
 def _fetch_mirror(commodity: str | None, limit: int) -> dict[str, Any]:
     params: dict[str, Any] = {"state": "Karnataka"}
     if commodity:
@@ -171,26 +199,44 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
         return {**cached, "cached": True}
 
     failures: list[str] = []
+    stale_candidates: list[dict[str, Any]] = []
 
-    # 1) Mirror first — fast and keyless, but only trusted while its own sync
-    #    is recent (its daily job has been known to silently die for weeks).
+    # 1) GitHub Actions relay — official data.gov.in rows fetched daily by CI
+    #    (Render's own IPs are firewalled off by data.gov.in; GitHub's are not).
+    try:
+        relay_payload = _fetch_relay(commodity, limit)
+        if relay_payload["records"]:
+            age = _data_age(relay_payload.get("updated_at"))
+            if age is not None and age <= MIRROR_MAX_AGE:
+                payload = {**relay_payload, "stale": False, "source_errors": failures}
+                _cache_put(key, payload)
+                return {**payload, "cached": False}
+            failures.append(f"_fetch_relay: newest sync is {age} old (limit {MIRROR_MAX_AGE})")
+            stale_candidates.append(relay_payload)
+        else:
+            failures.append("_fetch_relay: no records for this query")
+    except Exception as exc:
+        failures.append(f"_fetch_relay: {exc}")
+        log.warning("live-price relay failed: %s", exc)
+
+    # 2) Third-party mirror — fast and keyless, trusted only when recent.
     mirror_payload: dict[str, Any] | None = None
     try:
         mirror_payload = _fetch_mirror(commodity, limit)
+        if mirror_payload["records"]:
+            age = _data_age(mirror_payload.get("updated_at"))
+            if age is not None and age <= MIRROR_MAX_AGE:
+                payload = {**mirror_payload, "stale": False, "source_errors": failures}
+                _cache_put(key, payload)
+                return {**payload, "cached": False}
+            failures.append(f"_fetch_mirror: newest sync is {age} old (limit {MIRROR_MAX_AGE})")
+            stale_candidates.append(mirror_payload)
     except Exception as exc:
         failures.append(f"_fetch_mirror: {exc}")
         log.warning("live-price mirror failed: %s", exc)
 
-    if mirror_payload is not None:
-        age = _data_age(mirror_payload.get("updated_at"))
-        if age is not None and age <= MIRROR_MAX_AGE:
-            payload = {**mirror_payload, "stale": False, "source_errors": failures}
-            _cache_put(key, payload)
-            return {**payload, "cached": False}
-        failures.append(f"_fetch_mirror: newest sync is {age} old (limit {MIRROR_MAX_AGE})")
-        log.warning("mirror stale (%s old) — trying official data.gov.in", age)
-
-    # 2) Mirror stale or down → official data.gov.in (needs a real API key).
+    # 3) Direct data.gov.in — unreachable from Render's network (Errno 113),
+    #    but valid for local and other deployments.
     try:
         payload = _fetch_datagov(commodity, limit)
         if payload["records"]:
@@ -203,16 +249,18 @@ def get_karnataka_prices(commodity: str | None = None, limit: int = 100) -> dict
         failures.append(f"_fetch_datagov: {exc}")
         log.warning("data.gov.in failed: %s", exc)
 
-    # 3) Nothing fresh: serve the last mirror data, honestly flagged as stale,
-    #    so the UI can show the real sync date instead of implying it is live.
-    if mirror_payload is not None and mirror_payload["records"]:
-        log.warning("serving stale mirror data (sync %s) — %s",
-                    mirror_payload.get("updated_at"), "; ".join(failures))
-        stale_payload = {**mirror_payload, "stale": True, "source_errors": failures}
+    # 4) Nothing fresh: serve the newest stale data available, honestly
+    #    flagged, so the UI shows the real sync date instead of implying live.
+    if stale_candidates:
+        best = max(stale_candidates, key=lambda p: str(p.get("updated_at") or ""))
+        log.warning("serving stale data from %s (sync %s) — %s",
+                    best.get("source"), best.get("updated_at"), "; ".join(failures))
+        stale_payload = {**best, "stale": True, "source_errors": failures}
         _cache_put(key, stale_payload)
         return {**stale_payload, "cached": False}
 
     raise LiveMarketDataError(
-        "The live mandi feed is temporarily unavailable — both the daily sync "
-        "and the official data.gov.in source failed. Please try again in a minute."
+        "The live mandi feed is temporarily unavailable — the daily relay, "
+        "the mirror and the official data.gov.in source all failed. Please "
+        "try again in a minute."
     )
