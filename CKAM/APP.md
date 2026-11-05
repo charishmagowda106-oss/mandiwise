@@ -12,7 +12,8 @@ Two ways to experience MandiWise as an app, from "right now" to "real APK":
   harvest countdown, the **best mandi today** with price + estimated revenue
   for your lot, and one-tap **Compare** that prefills the mandi-comparison
   page. Harvest-window notification is pushed once when a crop is due (±7 days).
-- **Mandi comparison** — official AGMARKNET live rates + distance-aware
+- **Mandi comparison** — official AGMARKNET live rates (relayed fresh daily by
+  a CI job, since Render's servers are firewalled off from data.gov.in) + distance-aware
   profit ranking across 68 real Karnataka APMC mandis, with map, trend chart
   and WhatsApp sharing.
 - **Price predictions** — trained Random Forest model + forecast chart.
