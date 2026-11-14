@@ -2,7 +2,9 @@ name: Daily mandi data relay
 
 # Fetches the official AGMARKNET daily price feed (Karnataka) and publishes it
 # to the `live-data` branch, which https://mandiwise.onrender.com reads —
-# Render's IPs cannot reach api.data.gov.in directly.
+# neither GitHub's nor Render's IPs can reach api.data.gov.in (datacenter
+# addresses are refused since Sep 2026). Primary publisher is now the PC
+# runner .github/scripts/pc_relay.py; this workflow is kept as a backup.
 
 on:
   workflow_dispatch:

@@ -12,8 +12,9 @@ Two ways to experience MandiWise as an app, from "right now" to "real APK":
   harvest countdown, the **best mandi today** with price + estimated revenue
   for your lot, and one-tap **Compare** that prefills the mandi-comparison
   page. Harvest-window notification is pushed once when a crop is due (±7 days).
-- **Mandi comparison** — official AGMARKNET live rates (relayed fresh daily by
-  a CI job, since Render's servers are firewalled off from data.gov.in) + distance-aware
+- **Mandi comparison** — official AGMARKNET live rates (relayed every few
+  hours by a small job on your own PC, because data.gov.in refuses
+  datacenter servers like Render's and GitHub's) + distance-aware
   profit ranking across 68 real Karnataka APMC mandis, with map, trend chart
   and WhatsApp sharing.
 - **Price predictions** — trained Random Forest model + forecast chart.
@@ -157,3 +158,12 @@ codebase**.
 - **Production hosting**: deploy the backend (it already serves the web app)
   and point `VITE_API_BASE_URL` at it before `npm run app:sync`; then the app
   works on any network, no PC required.
+- **Live-rate relay**: `.github/scripts/pc_relay.py` runs every 4 hours as
+  the Windows task `MandiWiseRelay` (registered once by
+  `.github/scripts/register_pc_relay.ps1`). It fetches data.gov.in from this
+  PC's Indian IP — data.gov.in refuses datacenter addresses — and
+  force-pushes `karnataka.json` to the `live-data` branch Render reads. Your
+  key lives in `%LOCALAPPDATA%\mandiwise-relay\apikey.txt` (the repo is
+  public: never commit it); progress is logged to
+  `%LOCALAPPDATA%\mandiwise-relay\relay.log`. The GitHub Actions cron stays
+  enabled as a backup — whoever reaches data.gov.in first publishes.

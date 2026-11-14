@@ -1,12 +1,19 @@
 """Fetch the official AGMARKNET daily price feed for Karnataka.
 
-Runs on GitHub Actions: their runners reach api.data.gov.in, while Render's
-US IPs are firewalled off ([Errno 113] No route to host). Writes
-``karnataka.json`` at the repo root, which the workflow publishes to the
-``live-data`` branch for MandiWise to read via raw.githubusercontent.com.
+Writes ``karnataka.json`` in the current directory; a publisher then
+force-pushes it to the ``live-data`` branch for MandiWise to read via
+raw.githubusercontent.com. Two publishers exist:
 
-Set the ``DATA_GOV_API_KEY`` repository secret to use your own (free)
-data.gov.in key and get a dedicated rate quota instead of the shared demo key.
+  * ``pc_relay.py`` — the primary one: runs from an ordinary Indian PC,
+    because since late Sep 2026 data.gov.in refuses datacenter addresses
+    (GitHub Actions gets connection-refused, Render [Errno 113]).
+  * ``.github/workflows/mandi-relay.yml`` — kept as a backup in case the
+    datacenter block is ever lifted.
+
+Set ``DATA_GOV_API_KEY`` (Actions secret, or
+``%LOCALAPPDATA%\\mandiwise-relay\\apikey.txt`` for the PC runner) to your
+own free data.gov.in key and get a dedicated rate quota instead of the
+shared demo key.
 """
 
 from __future__ import annotations
