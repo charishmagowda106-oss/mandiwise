@@ -15,6 +15,15 @@ const formatStamp = value => {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
+/** Split a notification body into short bullet lines so the dropdown reads
+ *  like a checklist instead of a paragraph. Splits after sentence-ending
+ *  "." or ")." — never inside decimals like "12.3 km". */
+const toBullets = body =>
+  String(body || '')
+    .match(/.*?[.)](?=\s|$)|.+/g)
+    ?.map(line => line.trim())
+    .filter(Boolean) || [];
+
 /** Header bell: unread badge + dropdown of recent notifications, polled
  *  while the farmer is logged in. Marks items read as they are opened. */
 export default function NotificationBell({ label }) {
@@ -112,7 +121,11 @@ export default function NotificationBell({ label }) {
                     {!item.is_read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#197638]" />}
                     <div className={!item.is_read ? '' : 'pl-4'}>
                       <p className="text-sm font-semibold text-[#1c2b20]">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-gray-600">{item.body}</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-gray-600">
+                        {toBullets(item.body).map((line, idx) => (
+                          <li key={idx} className="leading-snug">{line}</li>
+                        ))}
+                      </ul>
                       <p className="mt-1 text-[11px] text-gray-400">{formatStamp(item.created_at)}</p>
                     </div>
                   </div>

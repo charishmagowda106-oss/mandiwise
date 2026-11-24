@@ -28,7 +28,7 @@ export default function PricePrediction() {
   };
 
   return <div className="space-y-8">
-    <header><p className="font-semibold text-[#197638]">{t('pred.kicker')}</p><h1 className="mt-2 text-4xl font-bold tracking-tight">{t('pred.title')}</h1><p className="mt-3 text-gray-600">{t('pred.sub')}</p></header>
+    <header><p className="font-semibold text-[#197638]">{t('pred.kicker')}</p><h1 className="mt-2 text-4xl font-bold tracking-tight">{t('pred.title')}</h1></header>
     <form onSubmit={handlePredict} className="mw-panel grid gap-5 p-6 md:grid-cols-3 md:p-8">
       <div><label className="mw-label">{t('cmp.crop')}</label><select required value={form.crop_id} onChange={e=>setForm({...form,crop_id:e.target.value})} className="mw-input">{crops.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
       <div><label className="mw-label">{t('pred.mandi')}</label><select required value={form.mandi_id} onChange={e=>setForm({...form,mandi_id:e.target.value})} className="mw-input">{mandis.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
